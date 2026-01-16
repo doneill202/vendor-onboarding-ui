@@ -8,16 +8,13 @@ on:
     types: [ opened, synchronize, reopened, closed ]
     branches: [ main ]
 
-# Needed so GitHub can mint the OIDC token for the job
-permissions:
-  id-token: write
-  contents: read
-
 jobs:
   build_and_deploy_job:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
     name: Build and Deploy Job
+    permissions:
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -25,25 +22,34 @@ jobs:
           submodules: true
           lfs: false
 
-      # Get an OIDC ID token (no require/import, no comments)
-      - name: Get OIDC Token
-        id: oidc
-        uses: actions/github-script@v7
-        with:
-          script: |
-            return await core.getIDToken();
-          result-encoding: string
+      # Sanity check: the portal-named secret must be present
+      - name: Verify SWA token is present
+        env:
+          TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_CALM_CLIFF_0BCAFC00F }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "ERROR: portal-named token secret is MISSING"; exit 1
+          else
+            echo "OK: portal-named token secret is present"
+          fi
 
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
+          # ✅ Use the portal-generated secret name
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_CALM_CLIFF_0BCAFC00F }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}   # optional, safe
+
+          # Upload static files (no build)
           action: "upload"
-          app_location: "/"        # index.html at repo root
-          api_location: ""         # your Functions API is separate
-          output_location: ""      # no build output
-          skip_app_build: true     # skip Oryx build
-          github_id_token: ${{ steps.oidc.outputs.result }}
+          app_location: "/"
+          api_location: ""
+          output_location: ""         # <-- important: empty
+          skip_app_build: true        # <-- important: skip Oryx
+
+          # Optional clarity
+          production_branch: "main"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
@@ -53,4 +59,6 @@ jobs:
       - name: Close Pull Request
         uses: Azure/static-web-apps-deploy@v1
         with:
+          # For PR cleanup, the action also expects a token
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_CALM_CLIFF_0BCAFC00F }}
           action: "close"
