@@ -8,6 +8,7 @@ on:
     types: [ opened, synchronize, reopened, closed ]
     branches: [ main ]
 
+# OIDC is required to mint an ID token for Azure auth
 permissions:
   id-token: write
   contents: read
@@ -24,14 +25,13 @@ jobs:
           submodules: true
           lfs: false
 
-      # 🔑 Get GitHub OIDC token to authenticate to Azure (no API key)
+      # ✅ Get an OIDC token without requiring '@actions/core'
       - name: Get OIDC Token
         id: oidc
         uses: actions/github-script@v7
         with:
           script: |
-            const core = require('@actions/core');
-            return await core.getIDToken();
+            return await core.getIDToken();   # 'core' is injected by github-script
           result-encoding: string
 
       - name: Build And Deploy
@@ -39,10 +39,10 @@ jobs:
         uses: Azure/static-web-apps-deploy@v1
         with:
           action: "upload"
-          app_location: "/"
-          api_location: ""
-          output_location: ""
-          skip_app_build: true
+          app_location: "/"        # your index.html is at repo root
+          api_location: ""         # API is separate (Function App)
+          output_location: ""      # nothing to build
+          skip_app_build: true     # don't run Oryx/npm
           github_id_token: ${{ steps.oidc.outputs.result }}
 
   close_pull_request_job:
@@ -54,4 +54,5 @@ jobs:
         uses: Azure/static-web-apps-deploy@v1
         with:
           action: "close"
-          github_id_token: ${{ steps.oidc.outputs.result }}
+          # Not strictly necessary here, but harmless
+          # github_id_token can be passed if required by your setup
