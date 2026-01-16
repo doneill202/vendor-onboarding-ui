@@ -12,12 +12,11 @@ on:
 
 jobs:
   build_and_deploy_job:
-    # Fix HTML-escaped && from portal copy: use real &&
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
     name: Build and Deploy Job
     permissions:
-      id-token: write
+      id-token: write   # harmless to keep
       contents: read
 
     steps:
@@ -26,41 +25,23 @@ jobs:
           submodules: true
           lfs: false
 
-      # These two steps are optional (added by new portal). Keeping them is fine.
-      - name: Install OIDC Client from Core Package
-        run: npm install @actions/core@1.6.0 @actions/http-client
-
-      - name: Get Id Token
-        uses: actions/github-script@v7
-        id: idtoken
-        with:
-          script: |
-            const core = require('@actions/core');
-            return await core.getIDToken();
-          result-encoding: string
+      # ---- No OIDC / github-script steps needed ----
 
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
-          # Use the exact secret name Azure created for your app
+          # Keep EXACT secret name created for your SWA
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_CALM_CLIFF_0BCAFC00F }}
 
-          # Tell the action to upload files directly (no build)
+          # Upload static files directly (no build)
           action: "upload"
 
           ###### Repository / Build Configurations ######
-          # Your index.html is at the repo root:
-          app_location: "/"
-          # No integrated API in SWA (your Functions app is separate):
-          api_location: ""
-          # There is no build output folder; leave empty:
-          output_location: ""
-          # Skip Oryx/npm build entirely:
-          skip_app_build: true
-
-          # (Optional) Pass the ID token the portal scaffold added:
-          github_id_token: ${{ steps.idtoken.outputs.result }}
+          app_location: "/"    # index.html is at repo root
+          api_location: ""     # no integrated API here
+          output_location: ""  # no build output folder
+          skip_app_build: true # <-- key: skip Oryx/npm build
           ###### End of Repository / Build Configurations ######
 
   close_pull_request_job:
