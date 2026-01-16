@@ -1,4 +1,4 @@
- 
+
 name: Azure Static Web Apps CI/CD
 
 on:
@@ -22,27 +22,33 @@ jobs:
           submodules: true
           lfs: false
 
-      # --- Debug: confirm the repo secret is actually present at runtime ---
+      # Sanity check: make sure the portal-named secret is available
       - name: Verify SWA token is present
         env:
-          TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_CALM_CLIFF_0BCAFC00F }}
         run: |
           if [ -z "$TOKEN" ]; then
-            echo "ERROR: AZURE_STATIC_WEB_APPS_API_TOKEN is MISSING"; exit 1
+            echo "ERROR: portal-named token secret is MISSING"; exit 1
           else
-            echo "OK: AZURE_STATIC_WEB_APPS_API_TOKEN is present"
+            echo "OK: portal-named token secret is present"
           fi
 
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          # Use the portal-generated secret name that matches this workflow
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_CALM_CLIFF_0BCAFC00F }}
+
+          # Upload static files directly (no build step)
           action: "upload"
-          app_location: "/"        # index.html at repo root
-          api_location: ""         # no integrated API
-          output_location: ""      # nothing to build
-          skip_app_build: true     # skip Oryx build for plain static files
+          app_location: "/"
+          api_location: ""
+          output_location: ""
+          skip_app_build: true
+
+          # Optional, safe defaults
+          production_branch: "main"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
@@ -53,4 +59,3 @@ jobs:
         uses: Azure/static-web-apps-deploy@v1
         with:
           action: "close"
-
