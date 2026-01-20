@@ -34,9 +34,26 @@ async function bootstrap(){
     const vendorToken = qs('vendorToken') || 'test-token-123';
     const inviterEmail = qs('inviterEmail') || '';
     state.vendorToken = vendorToken; state.inviterEmail = inviterEmail;
-    ref = (await getReference()).data || (await getReference());
-    const init = (await initDraft(vendorToken, inviterEmail)).data || (await initDraft(vendorToken, inviterEmail));
-    state.draftId = init.draftId; state.step = init.step || 1; state.payload = init.payload || {};
+    
+
+    // reference data: try `data` first, else use raw
+    const refResp = await getReference();
+    ref = refResp?.data ?? refResp;
+    
+    // init draft: call ONCE, accept either {ok,data:{...}} or plain body
+    const initResp = await initDraft(vendorToken, inviterEmail);
+    const init = initResp?.data ?? initResp;
+    
+    if (!init?.draftId) {
+      console.error('Init response had no draftId', initResp);
+      throw new Error('Init failed: no draftId returned');
+    }
+    
+    state.draftId = init.draftId;
+    state.step   = init.step   ?? 1;
+    state.payload= init.payload?? {};
+
+    
     const cached = loadLocal(state.draftId); if(cached){ state = {...state, ...cached}; }
     renderNav();
     routeTo(state.step);
