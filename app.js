@@ -88,7 +88,7 @@ function showThanks(){
 
 const pages = {
   // =====================
-  // Page 1 — Profile (Step 2)
+  // Page 1 — Profile
   // =====================
   1: function profile(){
     const p = state.payload?.page1 || {};
@@ -124,7 +124,7 @@ const pages = {
   },
 
   // =====================
-  // Page 2 — Sites (Step 3)
+  // Page 2 — Sites
   // =====================
   2: function sites(){
     const p = state.payload?.page2 || { sites: [] };
@@ -177,7 +177,7 @@ const pages = {
   },
 
   // =====================
-  // Page 3 — Contacts (Step 4)
+  // Page 3 — Contacts (layout tweak + review phone)
   // =====================
   3: function contacts(){
     const p = state.payload?.page3 || { contacts: [] };
@@ -187,6 +187,7 @@ const pages = {
       el('tr', {},
         el('th', {}, 'Name'),
         el('th', {}, 'Email'),
+        el('th', {}, 'Phone'),
         el('th', {}, 'Primary'),
         el('th', {}, 'Accounting'),
         el('th', {}, 'Mobile'),
@@ -201,6 +202,7 @@ const pages = {
         const tr = el('tr', {},
           el('td', {}, `${(c.firstName||'')} ${(c.lastName||'')}`.trim()),
           el('td', {}, c.email || ''),
+          el('td', {}, c.phone || ''),
           el('td', {}, c.isPrimary ? 'Primary' : ''),
           el('td', {}, c.isAccounting ? 'Accounting' : ''),
           el('td', {}, c.isMobile ? 'Mobile' : ''),
@@ -214,14 +216,23 @@ const pages = {
     const l  = textField({ placeholder:'Last name' });
     const e  = textField({ type:'email', placeholder:'email@domain.com' });
     const ph = textField({ placeholder:'Phone (optional)' });
+    ph.style.maxWidth = '280px';
 
     const prim = el('input', { type:'checkbox' });
     const acct = el('input', { type:'checkbox' });
-    const mob  = el('input', { type:'checkbox' });
+    const mob  = el('input', { type:'checkbox' }); // Is Mobile
 
     const add = el('button', { class:'btn', onclick:()=>{
       if(!f.value || !l.value || !e.value){ alert('Provide first, last, and email'); return; }
-      p.contacts.push({ firstName:f.value, lastName:l.value, email:e.value, phone:ph.value || '', isPrimary:prim.checked, isAccounting:acct.checked, isMobile:mob.checked });
+      p.contacts.push({
+        firstName:f.value,
+        lastName:l.value,
+        email:e.value,
+        phone:ph.value || '',
+        isPrimary:prim.checked,
+        isAccounting:acct.checked,
+        isMobile:mob.checked
+      });
       f.value=l.value=e.value=ph.value=''; prim.checked=acct.checked=mob.checked=false; render();
     }}, 'Add');
 
@@ -231,12 +242,14 @@ const pages = {
 
     app.appendChild(el('div', { class:'card' },
       el('h2', {}, 'Contacts'),
+      // Row 1: name + email
+      el('div', { class:'row' }, f, l, e),
+      // Row 2: phone (narrow) + Is Mobile + Add button on same row
+      el('div', { class:'row kv' }, ph, el('label', {}, el('input', { type:'checkbox', onchange:ev=>{ mob.checked = ev.target.checked; } }), ' Is Mobile'), add),
+      // Row 3: remaining flags
       el('div', { class:'row' },
-        f, l, e, ph,
         el('label', {}, el('input', { type:'checkbox', onchange:ev=>{ prim.checked = ev.target.checked; } }), ' Primary'),
-        el('label', {}, el('input', { type:'checkbox', onchange:ev=>{ acct.checked = ev.target.checked; } }), ' Accounting'),
-        el('label', {}, el('input', { type:'checkbox', onchange:ev=>{ mob.checked = ev.target.checked; } }), ' Is Mobile'),
-        add
+        el('label', {}, el('input', { type:'checkbox', onchange:ev=>{ acct.checked = ev.target.checked; } }), ' Accounting')
       ),
       table
     ));
@@ -248,7 +261,7 @@ const pages = {
   },
 
   // =====================
-  // Page 4 — Tax Docs (Step 5)
+  // Page 4 — Tax Docs (helper text)
   // =====================
   4: function tax(){
     const p = state.payload?.page4 || { taxDoc:null };
@@ -282,7 +295,7 @@ const pages = {
   },
 
   // =====================
-  // Page 5 — Demographics (Step 6)
+  // Page 5 — Demographics (helper text)
   // =====================
   5: function demographics(){
     const p = state.payload?.page5 || { percentFemale:50, ageBracketIds:[], lifeStageIds:[], incomeBracketIds:[] };
@@ -321,25 +334,21 @@ const pages = {
   },
 
   // =====================
-  // Page 6 — Interests (Step 7)
+  // Page 6 — Interests (helper text + Check All + sorted)
   // =====================
   6: function interests(){
     const p = state.payload?.page6 || { interestsAndIntentIds:[] };
 
-    // helper label
     const header = el('div', { class:'card' },
       el('h2', {}, 'Interests & Intent'),
       el('p', { class:'help' }, 'Please select the types of campaigns that resonate with your audience.')
     );
 
-    // Sorted list
     const list = sortByTitle(ref.interestsAndIntent || []);
 
-    // Selected -> from payload ids
     const selected = [];
     (p.interestsAndIntentIds || []).forEach(id=>{ const o = list.find(x=>x.id===id); if(o) selected.push(o); });
 
-    // Render container for (re)builds
     const uiBox = el('div');
     function buildUi(){
       uiBox.innerHTML = '';
@@ -347,7 +356,6 @@ const pages = {
     }
     buildUi();
 
-    // Check All button
     const checkAllBtn = el('button', { class:'btn', onclick:()=>{
       selected.splice(0, selected.length, ...list);
       p.interestsAndIntentIds = list.map(x=>x.id);
@@ -364,14 +372,13 @@ const pages = {
   },
 
   // =====================
-  // Page 7 — Capabilities (Step 8)
+  // Page 7 — Capabilities (sorted + labels)
   // =====================
   7: function capabilities(){
     const p = state.payload?.page7 || { adTypeIds:[], pricingTypeIds:[], targetingIds:[], campaignFunctionalityIds:[], regionIds:[] };
 
     function selFrom(list, ids){ const s=[]; (ids || []).forEach(id=>{ const o=list.find(x=>x.id===id); if(o) s.push(o); }); return s; }
 
-    // Sort all lists alphabetically
     const adList      = sortByTitle(ref.adTypes || []);
     const pricingList = sortByTitle(ref.pricingTypes || []);
     const targList    = sortByTitle(ref.targeting || []);
@@ -399,21 +406,41 @@ const pages = {
   },
 
   // =====================
-  // Page 8 — Review & Submit (Step 9)
+  // Page 8 — Review & Submit (detailed lists)
   // =====================
   8: function review(){
     const box = el('div', { class:'card' });
     box.appendChild(el('h2', {}, 'Review'));
 
     function row(title, val){ box.appendChild(el('div', { class:'row' }, el('div', { class:'badge' }, title), el('div', {}, val))); }
+    function titlesFrom(list, ids){
+      const map = new Map((list||[]).map(x=>[x.id, x.title]));
+      return (ids||[]).map(id=> map.get(id)).filter(Boolean).sort((a,b)=> String(a).localeCompare(String(b)));
+    }
 
     const p1 = state.payload?.page1 || {}; row('Company', p1.companyName || ''); row('Website', p1.website || '');
+
     const p2 = state.payload?.page2 || { sites:[] }; row('Sites', (p2.sites || []).map(s=> `${s.siteName} (${s.url})`).join(', '));
-    const p3 = state.payload?.page3 || { contacts:[] }; row('Contacts', (p3.contacts || []).map(c=> `${c.firstName} ${c.lastName} <${c.email}>${c.isPrimary?' [Primary]':''}${c.isAccounting?' [Accounting]':''}${c.isMobile?' [Mobile]':''}`).join('; '));
+
+    const p3 = state.payload?.page3 || { contacts:[] };
+    const contactsList = (p3.contacts||[]).map(c=> `${c.firstName||''} ${c.lastName||''} <${c.email||''}>${c.phone? ' ('+c.phone+')':''}${c.isPrimary?' [Primary]':''}${c.isAccounting?' [Accounting]':''}${c.isMobile?' [Mobile]':''}`.trim());
+    row('Contacts', contactsList.join('; '));
+
     const p4 = state.payload?.page4 || {}; row('Tax Doc', p4.taxDoc ? p4.taxDoc.fileName : 'None');
+
     const p5 = state.payload?.page5 || {}; row('Percent Female', String(p5.percentFemale ?? 50)+'%');
-    const p6 = state.payload?.page6 || {}; row('Interests', ((p6.interestsAndIntentIds)||[]).length + ' selected');
-    const p7 = state.payload?.page7 || {}; row('Capabilities', ['AdTypes','Pricing','Targeting','Campaign','Regions'].join(', '));
+    const demoAge = titlesFrom(ref.ageBrackets, p5.ageBracketIds); row('Age Brackets', demoAge.join(', ') || 'None');
+    const demoLife= titlesFrom(ref.lifeStages, p5.lifeStageIds); row('Life Stages', demoLife.join(', ') || 'None');
+    const demoInc = titlesFrom(ref.householdIncomeBrackets, p5.incomeBracketIds); row('Household Income', demoInc.join(', ') || 'None');
+
+    const p6 = state.payload?.page6 || {}; const interests = titlesFrom(ref.interestsAndIntent, p6.interestsAndIntentIds); row('Interests', interests.join(', ') || 'None');
+
+    const p7 = state.payload?.page7 || {};
+    row('Ad Types',      titlesFrom(ref.adTypes, p7.adTypeIds).join(', ') || 'None');
+    row('Pricing Types', titlesFrom(ref.pricingTypes, p7.pricingTypeIds).join(', ') || 'None');
+    row('Targeting',     titlesFrom(ref.targeting, p7.targetingIds).join(', ') || 'None');
+    row('Campaign Func', titlesFrom(ref.campaignFunctionality, p7.campaignFunctionalityIds).join(', ') || 'None');
+    row('Regions',       titlesFrom(ref.regions, p7.regionIds).join(', ') || 'None');
 
     const submit = el('button', { class:'btn primary', onclick: async()=>{
       try{
