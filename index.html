@@ -2,39 +2,43 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Intnt Vendor Onboarding</title>
 
-  <!-- Fonts -->
+  <!-- Fonts (fixed): proper preconnect + stylesheet -->
   https://fonts.googleapis.com
-  https://fonts.gstatic.com
-  https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap
+  <link rel="preconnect" href="https://onts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap
 
   <!-- Styles -->
   /styles.css
+  /assets/favicon.png
 </head>
 <body>
-  <header class="app-header">
+  <header class="app-header" role="banner">
     <div class="brand">
-      /assets/intnt-powered-by-adquire.png
+      /assets/logo.png
       <span class="brand-title">Intnt Vendor Hub</span>
     </div>
-    <nav id="stepsNav" class="steps"></nav>
+    <nav id="stepsNav" class="steps" aria-label="Onboarding steps"></nav>
   </header>
 
-  <main id="app" class="app-main"></main>
+  <main id="app" class="app-main" role="main">
+    <noscript>This application requires JavaScript to run. Please enable JavaScript in your browser.</noscript>
+  </main>
 
   <footer class="app-footer">© <span id="yy"></span> AdQuire</footer>
 
   <script>
+    // Keep your existing year logic
     document.getElementById('yy').textContent = new Date().getFullYear();
   </script>
 
-  <!-- App modules -->
+  <!-- App modules (order unchanged) -->
   /config.js</script>
   /api.js</script>
   /components.js</script>
   /app.js</script>
 </body>
 </html>
+``
