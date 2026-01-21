@@ -5,23 +5,39 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Intnt Vendor Onboarding</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css" />
+
+  <!-- Fonts -->
+  https://fonts.googleapis.com
+  https://fonts.gstatic.com
+  https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap
+
+  <!-- Styles -->
+  /styles.css
 </head>
 <body>
   <header class="app-header">
-    <div class="brand">Intnt Vendor Hub</div>
+    <div class="brand">
+      <!-- If you renamed to logo.png, change the src below to /assets/logo.png -->
+      /assets/intnt-powered-by-adquire.png
+      <span class="brand-title">Intnt Vendor Hub</span>
+    </div>
     <nav id="stepsNav" class="steps"></nav>
   </header>
+
   <main id="app" class="app-main"></main>
-  <footer class="app-footer">© <span id="yy"></span> AdQuire</footer>
-  <script>document.getElementById('yy').textContent=new Date().getFullYear()</script>
-  <script type="module" src="/config.js"></script>
-  <script type="module" src="/api.js"></script>
-  <script type="module" src="/components.js"></script>
-  <script type="module" src="/app.js"></script>
+
+  <footer class="app-footer">
+    © <span id="yy"></span> AdQuire
+  </footer>
+
+  <script>
+    document.getElementById('yy').textContent = new Date().getFullYear();
+  </script>
+
+  <!-- App modules -->
+  /config.js</script>
+  /api.js</script>
+  /components.js</script>
+  /app.js</script>
 </body>
 </html>
- 
