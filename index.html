@@ -5,19 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Intnt Vendor Onboarding</title>
 
-  <!-- Fonts (fixed): proper preconnect + stylesheet -->
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-  <!-- Styles -->
-  <link rel="stylesheet" href="/styles.css" />
-  <link rel="icon" href="/assets/favicon.png" />
+  <!-- Styles (relative paths) -->
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="assets/favicon.png" />
 </head>
 <body>
   <header class="app-header" role="banner">
     <div class="brand">
-      <img class="brand-logo" src="/assets/logo.png" alt="Intnt Vendor Hub logo" />
+      <img class="brand-logo" src="assets/logo.png" alt="Intnt Vendor Hub logo" />
       <span class="brand-title">Intnt Vendor Hub</span>
     </div>
     <nav id="stepsNav" class="steps" aria-label="Onboarding steps"></nav>
@@ -30,14 +30,10 @@
   <footer class="app-footer">© <span id="yy"></span> AdQuire</footer>
 
   <script>
-    // Keep your existing year logic
     document.getElementById('yy').textContent = new Date().getFullYear();
   </script>
 
-  <!-- App modules (order unchanged) -->
-  <script src="/config.js" defer></script>
-  <script src="/api.js" defer></script>
-  <script src="/components.js" defer></script>
-  <script src="/app.js" defer></script>
+  <!-- Entry point: if your app uses ES modules, app.js should import other files -->
+  <script type="module" src="app.js"></script>
 </body>
 </html>
