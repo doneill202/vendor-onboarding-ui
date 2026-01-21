@@ -1,200 +1,38 @@
-/* =========================================
-   Intnt Vendor Hub — Light Theme (Global)
-   Keeps existing structure & IDs intact
-   ========================================= */
 
-:root {
-  color-scheme: light;
-
-  /* Theme colors */
-  --color-bg: #f5f7fb;         /* app background */
-  --color-surface: #ffffff;    /* header/cards/panels */
-  --color-text: #1f2937;       /* main text */
-  --color-muted: #6b7280;      /* secondary text */
-  --color-primary: #2563eb;    /* links/buttons */
-  --color-border: #e5e7eb;     /* subtle borders */
-  --color-focus: #94c5ff;      /* focus outline */
-
-  --radius: 10px;
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.06);
+:root{
+  --bg:#0b1220; --card:#11192b; --muted:#93a1b1; --text:#e6edf3; --brand:#4ea1ff; --ok:#2ecc71; --warn:#f39c12; --err:#e74c3c;
 }
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+.app-header{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;border-bottom:1px solid #1a253a;background:#0e1526;position:sticky;top:0;z-index:2}
+.brand{font-weight:700;letter-spacing:.3px}
+.steps{display:flex;gap:8px;flex-wrap:wrap}
+.steps .pill{padding:8px 10px;border-radius:999px;background:#15213a;color:#b7c3d0;font-size:12px;border:1px solid #223357}
+.steps .pill.active{background:var(--brand);color:#061020;border-color:var(--brand)}
+.app-main{max-width:980px;margin:20px auto;padding:0 16px 60px}
+.card{background:var(--card);border:1px solid #1b2741;border-radius:12px;padding:18px;margin-bottom:16px}
+.row{display:flex;gap:14px;flex-wrap:wrap}
+label{display:block;margin:2px 0 6px;font-size:13px;color:#c7d2e0}
+input[type=text], input[type=email], input[type=url], input[type=number], select, textarea{
+  width:100%;padding:10px 12px;border-radius:8px;border:1px solid #28385e;background:#0f182c;color:var(--text)
 }
-
-html, body {
-  height: 100%;
-}
-
-body {
-  margin: 0;
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue",
-    Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
-    "Noto Color Emoji", sans-serif;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* Links */
-a {
-  color: var(--color-primary);
-  text-decoration: none;
-}
-a:hover,
-a:focus {
-  text-decoration: underline;
-}
-
-/* Accessible focus ring */
-:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-/* ---------- Header ---------- */
-.app-header {
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-  box-shadow: var(--shadow-1);
-  padding: env(safe-area-inset-top) 16px 12px 16px;
-  min-height: 64px;
-}
-
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  color: inherit;
-}
-
-.brand-logo {
-  height: 36px;
-  width: auto;
-  display: block;
-  object-fit: contain;
-}
-
-.brand-title {
-  font-size: 1.125rem; /* 18px */
-  font-weight: 600;
-  letter-spacing: 0.2px;
-}
-
-/* Steps nav container (your SPA populates this) */
-.steps {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Optional: generic step pill styling if you add classes later */
-.steps .step {
-  background: #f0f3fa;
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 0.9rem;
-}
-
-/* ---------- Main content area ---------- */
-.app-main {
-  min-height: calc(100vh - 64px - 56px); /* header + footer approx */
-  padding: 16px;
-}
-
-/* Surface/card utility for your components */
-.surface {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-1);
-}
-
-/* ---------- Footer ---------- */
-.app-footer {
-  color: var(--color-muted);
-  text-align: center;
-  padding: 16px;
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
-}
-
-/* ---------- Forms (non-invasive) ---------- */
-input[type="text"],
-input[type="email"],
-input[type="tel"],
-input[type="url"],
-input[type="number"],
-select,
-textarea {
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 10px 12px;
-}
-
-input::placeholder,
-textarea::placeholder {
-  color: var(--color-muted);
-}
-
-/* Buttons (generic) */
-button {
-  color: #ffffff;
-  background: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  border-radius: 8px;
-  padding: 10px 14px;
-  cursor: pointer;
-}
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Tables (if you render any) */
-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  overflow: hidden;
-}
-th, td {
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--color-border);
-}
-th {
-  text-align: left;
-  color: var(--color-muted);
-  background: #fafafa;
-}
-
-/* Utilities */
-.container { max-width: 1200px; margin: 0 auto; }
-.mt-16 { margin-top: 16px; }
-.mt-24 { margin-top: 24px; }
-.mt-32 { margin-top: 32px; }
-.p-16  { padding: 16px; }
-.p-24  { padding: 24px; }
-
-/* Images safe sizing */
-img { max-width: 100%; height: auto; display: block; }
+textarea{min-height:96px}
+button.btn{padding:10px 14px;border-radius:10px;border:1px solid #27416b;background:#18365f;color:#eaf2ff;cursor:pointer}
+button.btn.primary{background:var(--brand);border-color:var(--brand);color:#061020;font-weight:600}
+button.btn.ghost{background:transparent;border-color:#2a3d66}
+button.btn:disabled{opacity:.6;cursor:not-allowed}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.kv{display:flex;gap:10px;align-items:center}
+.badge{padding:4px 8px;border-radius:999px;background:#1a2742;font-size:12px;color:#b8c7db}
+.msg{padding:10px;border-radius:10px}
+.msg.ok{background:#143524;border:1px solid #275f3f}
+.msg.err{background:#3a1e22;border:1px solid #7a2d37}
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{border-bottom:1px solid #223357;padding:10px;text-align:left}
+.help{color:#a4b2c5;font-size:12px}
+.tag{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:#1a2742;margin:4px}
+.tag button{border:none;background:transparent;color:#bcd;cursor:pointer;margin-left:6px}
+.slider{width:100%}
+.small{font-size:12px;color:#9db0c5}
