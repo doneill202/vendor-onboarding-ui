@@ -17,13 +17,17 @@ const steps = [
 ];
 
 let ref = null; // reference data
-let state = { draftId:null, step:1, vendorToken:null, inviterEmail:'' };
+let state = { draftId:null, step:1, vendorToken:null, inviterEmail:'', payload:{} };
 
 function qs(name){ return new URL(window.location).searchParams.get(name); }
-function saveLocal(){ localStorage.setItem('intnt_draft_'+state.draftId, JSON.stringify(state)); }
+function saveLocal(){ if(state.draftId) localStorage.setItem('intnt_draft_'+state.draftId, JSON.stringify(state)); }
 function loadLocal(did){ const s = localStorage.getItem('intnt_draft_'+did); if(s) { try { return JSON.parse(s); } catch { return null; } } return null; }
 
+function sortByTitle(list){ return (list||[]).slice().sort((a,b)=> String(a.title).localeCompare(String(b.title))); }
+
 function renderNav(){
+  // Hide steps on final Thank You view (no back)
+  if(state.step === 9){ nav.style.display = 'none'; return; } else { nav.style.display = ''; }
   nav.innerHTML = '';
   steps.forEach(s=>{
     const pill = el('div', { class: 'pill' + (state.step===s.id ? ' active':'' ) }, `${s.id}. ${s.title}`);
@@ -69,9 +73,22 @@ function btnRow(prev, next, {hidePrev=false, onPrev=null, onNext=null, nextText=
   return row;
 }
 
+function showThanks(){
+  state.step = 9; // special terminal view
+  renderNav();
+  window.location.hash = '#done';
+  app.innerHTML = '';
+  const box = el('div', { class:'card' },
+    el('div', { class:'row' }, el('img', { src:'assets/logo.png', alt:'Intnt Vendor Hub logo', style:'height:48px;width:auto;' })),
+    el('h2', {}, 'Thank you!'),
+    el('p', {}, 'We appreciate you taking the time to complete your onboarding. We\'ll review your information and be in touch shortly.'),
+  );
+  app.appendChild(box);
+}
+
 const pages = {
   // =====================
-  // Page 1 — Profile (already updated in Step 2)
+  // Page 1 — Profile (Step 2)
   // =====================
   1: function profile(){
     const p = state.payload?.page1 || {};
@@ -107,12 +124,11 @@ const pages = {
   },
 
   // =====================
-  // Page 2 — Sites (Step 3 changes here)
+  // Page 2 — Sites (Step 3)
   // =====================
   2: function sites(){
     const p = state.payload?.page2 || { sites: [] };
 
-    // NEW: helper label
     const header = el('div', { class:'card' },
       el('h2', {}, 'Sites'),
       el('p', { class:'help' }, 'Enter your owned and operated sites.')
@@ -134,7 +150,6 @@ const pages = {
       });
     }
 
-    // NEW: placeholder/help text for Site Name
     const nameI = textField({ placeholder:'Site name (e.g., YourSite.com)' });
     const urlI  = textField({ placeholder:'https://www.yoursite.com' });
 
@@ -162,13 +177,24 @@ const pages = {
   },
 
   // =====================
-  // Page 3 — Contacts (unchanged here)
+  // Page 3 — Contacts (Step 4)
   // =====================
   3: function contacts(){
     const p = state.payload?.page3 || { contacts: [] };
 
     const table = el('table', { class:'table' });
+    const thead = el('thead', {},
+      el('tr', {},
+        el('th', {}, 'Name'),
+        el('th', {}, 'Email'),
+        el('th', {}, 'Primary'),
+        el('th', {}, 'Accounting'),
+        el('th', {}, 'Mobile'),
+        el('th', {}, '')
+      )
+    );
     const tbody = el('tbody');
+
     function render(){
       tbody.innerHTML='';
       p.contacts.forEach((c,i)=>{
@@ -177,33 +203,39 @@ const pages = {
           el('td', {}, c.email || ''),
           el('td', {}, c.isPrimary ? 'Primary' : ''),
           el('td', {}, c.isAccounting ? 'Accounting' : ''),
+          el('td', {}, c.isMobile ? 'Mobile' : ''),
           el('td', {}, el('button', { class:'btn', onclick:()=>{ p.contacts.splice(i,1); render(); } }, 'Remove'))
         );
         tbody.appendChild(tr);
       });
     }
 
-    const f = textField({ placeholder:'First name' });
-    const l = textField({ placeholder:'Last name' });
-    const e = textField({ type:'email', placeholder:'email@domain.com' });
+    const f  = textField({ placeholder:'First name' });
+    const l  = textField({ placeholder:'Last name' });
+    const e  = textField({ type:'email', placeholder:'email@domain.com' });
     const ph = textField({ placeholder:'Phone (optional)' });
+
     const prim = el('input', { type:'checkbox' });
     const acct = el('input', { type:'checkbox' });
+    const mob  = el('input', { type:'checkbox' });
 
     const add = el('button', { class:'btn', onclick:()=>{
       if(!f.value || !l.value || !e.value){ alert('Provide first, last, and email'); return; }
-      p.contacts.push({ firstName:f.value, lastName:l.value, email:e.value, phone:ph.value || '', isPrimary:prim.checked, isAccounting:acct.checked });
-      f.value=l.value=e.value=ph.value=''; prim.checked=acct.checked=false; render();
+      p.contacts.push({ firstName:f.value, lastName:l.value, email:e.value, phone:ph.value || '', isPrimary:prim.checked, isAccounting:acct.checked, isMobile:mob.checked });
+      f.value=l.value=e.value=ph.value=''; prim.checked=acct.checked=mob.checked=false; render();
     }}, 'Add');
 
-    table.appendChild(el('thead', {}, el('tr', {}, el('th', {}, 'Name'), el('th', {}, 'Email'), el('th', {}, 'Primary'), el('th', {}, 'Accounting'), el('th', {}, ''))));
-    table.appendChild(tbody); render();
+    table.appendChild(thead);
+    table.appendChild(tbody);
+    render();
 
     app.appendChild(el('div', { class:'card' },
       el('h2', {}, 'Contacts'),
-      el('div', { class:'row' }, f, l, e, ph,
+      el('div', { class:'row' },
+        f, l, e, ph,
         el('label', {}, el('input', { type:'checkbox', onchange:ev=>{ prim.checked = ev.target.checked; } }), ' Primary'),
         el('label', {}, el('input', { type:'checkbox', onchange:ev=>{ acct.checked = ev.target.checked; } }), ' Accounting'),
+        el('label', {}, el('input', { type:'checkbox', onchange:ev=>{ mob.checked = ev.target.checked; } }), ' Is Mobile'),
         add
       ),
       table
@@ -216,16 +248,23 @@ const pages = {
   },
 
   // =====================
-  // Page 4 — Tax Docs
+  // Page 4 — Tax Docs (Step 5)
   // =====================
   4: function tax(){
     const p = state.payload?.page4 || { taxDoc:null };
+
+    const header = el('div', { class:'card' },
+      el('h2', {}, 'Tax Document (W-9/W-8)'),
+      el('p', { class:'help' }, "Upload your company’s tax document (optional).")
+    );
+
     const info = el('div', { class:'small' }, SETTINGS.taxOptional ? 'This step is optional. PDF up to 10 MB.' : 'PDF up to 10 MB is required.');
     const file = el('input', { type:'file', accept:'application/pdf' });
     const status = el('div', { class:'small' });
     if(p.taxDoc){ status.textContent = `Current: ${p.taxDoc.fileName}`; }
 
-    app.appendChild(el('div', { class:'card' }, el('h2', {}, 'Tax Document (W-9/W-8)'), info, file, status));
+    app.appendChild(header);
+    app.appendChild(el('div', { class:'card' }, info, file, status));
 
     app.appendChild(btnRow(3,5,{ onPrev:()=>routeTo(3), nextText:'Save & Continue', onNext: async()=>{
       if(!file.files?.length){
@@ -243,10 +282,15 @@ const pages = {
   },
 
   // =====================
-  // Page 5 — Demographics
+  // Page 5 — Demographics (Step 6)
   // =====================
   5: function demographics(){
     const p = state.payload?.page5 || { percentFemale:50, ageBracketIds:[], lifeStageIds:[], incomeBracketIds:[] };
+
+    const header = el('div', { class:'card' },
+      el('h2', {}, 'Demographics'),
+      el('p', { class:'help' }, 'Please describe the audience of your site(s).')
+    );
 
     const ageList = ref.ageBrackets || [];
     const lifeList = ref.lifeStages || [];
@@ -264,7 +308,8 @@ const pages = {
     const uiL = multiSelect(lifeList, selL, sel=>{ p.lifeStageIds = sel.map(x=>x.id); });
     const uiI = multiSelect(incList, selI, sel=>{ p.incomeBracketIds = sel.map(x=>x.id); });
 
-    app.appendChild(el('div', { class:'card' }, el('h2', {}, 'Demographics'), el('div', { class:'row' }, el('label', {}, 'Percent Female'), pf, pfVal)));
+    app.appendChild(header);
+    app.appendChild(el('div', { class:'card' }, el('div', { class:'row' }, el('label', {}, 'Percent Female'), pf, pfVal)));
     app.appendChild(el('div', { class:'card' }, el('h3', {}, 'Age Brackets (select at least one)'), uiA));
     app.appendChild(el('div', { class:'card' }, el('h3', {}, 'Life Stages (select at least one)'), uiL));
     app.appendChild(el('div', { class:'card' }, el('h3', {}, 'Household Income Brackets (select at least one)'), uiI));
@@ -276,42 +321,75 @@ const pages = {
   },
 
   // =====================
-  // Page 6 — Interests
+  // Page 6 — Interests (Step 7)
   // =====================
   6: function interests(){
     const p = state.payload?.page6 || { interestsAndIntentIds:[] };
-    const list = ref.interestsAndIntent || [];
+
+    // helper label
+    const header = el('div', { class:'card' },
+      el('h2', {}, 'Interests & Intent'),
+      el('p', { class:'help' }, 'Please select the types of campaigns that resonate with your audience.')
+    );
+
+    // Sorted list
+    const list = sortByTitle(ref.interestsAndIntent || []);
+
+    // Selected -> from payload ids
     const selected = [];
     (p.interestsAndIntentIds || []).forEach(id=>{ const o = list.find(x=>x.id===id); if(o) selected.push(o); });
-    const ui = multiSelect(list, selected, sel=>{ p.interestsAndIntentIds = sel.map(x=>x.id); });
 
-    app.appendChild(el('div', { class:'card' }, el('h2', {}, 'Interests & Intent (select at least 3)'), ui));
+    // Render container for (re)builds
+    const uiBox = el('div');
+    function buildUi(){
+      uiBox.innerHTML = '';
+      uiBox.appendChild(multiSelect(list, selected, sel=>{ p.interestsAndIntentIds = sel.map(x=>x.id); }));
+    }
+    buildUi();
+
+    // Check All button
+    const checkAllBtn = el('button', { class:'btn', onclick:()=>{
+      selected.splice(0, selected.length, ...list);
+      p.interestsAndIntentIds = list.map(x=>x.id);
+      buildUi();
+    }}, 'Check All');
+
+    app.appendChild(header);
+    app.appendChild(el('div', { class:'card' }, uiBox, el('div', { class:'row' }, checkAllBtn)));
+
     app.appendChild(btnRow(5,7,{ onPrev:()=>routeTo(5), onNext: async()=>{
-      if(!p.interestsAndIntentIds || p.interestsAndIntentIds.length < 3){ alert(`Please select at least ${SETTINGS.minInterests}`); return; }
+      if(!p.interestsAndIntentIds || p.interestsAndIntentIds.length < SETTINGS.minInterests){ alert(`Please select at least ${SETTINGS.minInterests}`); return; }
       state.payload = state.payload || {}; state.payload.page6 = p; saveLocal(); await savePage(state.draftId,6,p); routeTo(7);
     }}));
   },
 
   // =====================
-  // Page 7 — Capabilities
+  // Page 7 — Capabilities (Step 8)
   // =====================
   7: function capabilities(){
     const p = state.payload?.page7 || { adTypeIds:[], pricingTypeIds:[], targetingIds:[], campaignFunctionalityIds:[], regionIds:[] };
 
     function selFrom(list, ids){ const s=[]; (ids || []).forEach(id=>{ const o=list.find(x=>x.id===id); if(o) s.push(o); }); return s; }
 
-    const ad       = multiSelect(ref.adTypes || [], selFrom(ref.adTypes || [], p.adTypeIds), sel=>{ p.adTypeIds = sel.map(x=>x.id); });
-    const pricing  = multiSelect(ref.pricingTypes || [], selFrom(ref.pricingTypes || [], p.pricingTypeIds), sel=>{ p.pricingTypeIds = sel.map(x=>x.id); });
-    const targeting= multiSelect(ref.targeting || [], selFrom(ref.targeting || [], p.targetingIds), sel=>{ p.targetingIds = sel.map(x=>x.id); });
-    const camp     = multiSelect(ref.campaignFunctionality || [], selFrom(ref.campaignFunctionality || [], p.campaignFunctionalityIds), sel=>{ p.campaignFunctionalityIds = sel.map(x=>x.id); });
-    const regions  = multiSelect(ref.regions || [], selFrom(ref.regions || [], p.regionIds), sel=>{ p.regionIds = sel.map(x=>x.id); });
+    // Sort all lists alphabetically
+    const adList      = sortByTitle(ref.adTypes || []);
+    const pricingList = sortByTitle(ref.pricingTypes || []);
+    const targList    = sortByTitle(ref.targeting || []);
+    const campList    = sortByTitle(ref.campaignFunctionality || []);
+    const regionList  = sortByTitle(ref.regions || []);
 
-    app.appendChild(el('div', { class:'card' }, el('h2', {}, 'Capabilities')));
-    app.appendChild(el('div', { class:'card' }, el('h3', {}, 'Ad Types (≥1)'), ad));
-    app.appendChild(el('div', { class:'card' }, el('h3', {}, 'Pricing Types (≥1)'), pricing));
-    app.appendChild(el('div', { class:'card' }, el('h3', {}, 'Targeting (≥1)'), targeting));
-    app.appendChild(el('div', { class:'card' }, el('h3', {}, 'Campaign Functionality (≥1)'), camp));
-    app.appendChild(el('div', { class:'card' }, el('h3', {}, 'Regions (≥1)'), regions));
+    const ad       = multiSelect(adList, selFrom(adList, p.adTypeIds), sel=>{ p.adTypeIds = sel.map(x=>x.id); });
+    const pricing  = multiSelect(pricingList, selFrom(pricingList, p.pricingTypeIds), sel=>{ p.pricingTypeIds = sel.map(x=>x.id); });
+    const targeting= multiSelect(targList, selFrom(targList, p.targetingIds), sel=>{ p.targetingIds = sel.map(x=>x.id); });
+    const camp     = multiSelect(campList, selFrom(campList, p.campaignFunctionalityIds), sel=>{ p.campaignFunctionalityIds = sel.map(x=>x.id); });
+    const regions  = multiSelect(regionList, selFrom(regionList, p.regionIds), sel=>{ p.regionIds = sel.map(x=>x.id); });
+
+    app.appendChild(el('div', { class:'card' }, el('h2', {}, 'Capabilities'), el('p', { class:'help' }, 'Please describe your advertising capabilities.')));
+    app.appendChild(el('div', { class:'card' }, el('h3', {}, 'Ad Types (please select at least one)'), ad));
+    app.appendChild(el('div', { class:'card' }, el('h3', {}, 'Pricing Types (please select at least one)'), pricing));
+    app.appendChild(el('div', { class:'card' }, el('h3', {}, 'Targeting (please select at least one)'), targeting));
+    app.appendChild(el('div', { class:'card' }, el('h3', {}, 'Campaign Functionality (please select at least one)'), camp));
+    app.appendChild(el('div', { class:'card' }, el('h3', {}, 'Regions (please select at least one)'), regions));
 
     app.appendChild(btnRow(6,8,{ onPrev:()=>routeTo(6), nextText:'Save & Review', onNext: async()=>{
       const ok = p.adTypeIds?.length && p.pricingTypeIds?.length && p.targetingIds?.length && p.campaignFunctionalityIds?.length && p.regionIds?.length;
@@ -321,7 +399,7 @@ const pages = {
   },
 
   // =====================
-  // Page 8 — Review & Submit
+  // Page 8 — Review & Submit (Step 9)
   // =====================
   8: function review(){
     const box = el('div', { class:'card' });
@@ -331,14 +409,17 @@ const pages = {
 
     const p1 = state.payload?.page1 || {}; row('Company', p1.companyName || ''); row('Website', p1.website || '');
     const p2 = state.payload?.page2 || { sites:[] }; row('Sites', (p2.sites || []).map(s=> `${s.siteName} (${s.url})`).join(', '));
-    const p3 = state.payload?.page3 || { contacts:[] }; row('Contacts', (p3.contacts || []).map(c=> `${c.firstName} ${c.lastName} <${c.email}>${c.isPrimary?' [Primary]':''}${c.isAccounting?' [Accounting]':''}`).join('; '));
+    const p3 = state.payload?.page3 || { contacts:[] }; row('Contacts', (p3.contacts || []).map(c=> `${c.firstName} ${c.lastName} <${c.email}>${c.isPrimary?' [Primary]':''}${c.isAccounting?' [Accounting]':''}${c.isMobile?' [Mobile]':''}`).join('; '));
     const p4 = state.payload?.page4 || {}; row('Tax Doc', p4.taxDoc ? p4.taxDoc.fileName : 'None');
     const p5 = state.payload?.page5 || {}; row('Percent Female', String(p5.percentFemale ?? 50)+'%');
     const p6 = state.payload?.page6 || {}; row('Interests', ((p6.interestsAndIntentIds)||[]).length + ' selected');
     const p7 = state.payload?.page7 || {}; row('Capabilities', ['AdTypes','Pricing','Targeting','Campaign','Regions'].join(', '));
 
     const submit = el('button', { class:'btn primary', onclick: async()=>{
-      try{ const res = await submitDraft(state.draftId); alert('Submitted! Thank you.'); } catch(e){ alert('Submit failed: ' + e.message); }
+      try{
+        await submitDraft(state.draftId);
+        showThanks();
+      }catch(e){ alert('Submit failed: ' + e.message); }
     }}, 'Submit');
 
     app.appendChild(box);
@@ -346,5 +427,11 @@ const pages = {
   }
 };
 
-window.addEventListener('hashchange', ()=>{ const s = parseInt(location.hash.replace('#','') || state.step, 10); if(steps.some(x=>x.id===s)) routeTo(s); });
+window.addEventListener('hashchange', ()=>{
+  const h = location.hash.replace('#','');
+  if(h === 'done'){ showThanks(); return; }
+  const s = parseInt(h || state.step, 10);
+  if(steps.some(x=>x.id===s)) routeTo(s);
+});
+
 bootstrap();
