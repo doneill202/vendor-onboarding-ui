@@ -71,12 +71,11 @@ function btnRow(prev, next, {hidePrev=false, onPrev=null, onNext=null, nextText=
 
 const pages = {
   // =====================
-  // Page 1 — Profile
+  // Page 1 — Profile (already updated in Step 2)
   // =====================
   1: function profile(){
     const p = state.payload?.page1 || {};
 
-    // Welcome / helper text (new)
     const welcome = el('div', { class:'card' },
       el('h2', {}, 'Company Profile'),
       el('p', { class:'help' }, 'Thanks for filling out your company profile. You can exit at any time and return using the link from your email to continue where you left off.')
@@ -86,11 +85,8 @@ const pages = {
     const nameInput = textField({ value: p.companyName || '', oninput:v=> p.companyName = v });
     const webInput  = textField({ type:'url', value: p.website || '', oninput:v=> p.website = v, placeholder:'https://example.com' });
 
-    // Keep labels but rename Website -> Corporate Website (label only)
     app.appendChild(inputRow('Company Name *', nameInput));
     app.appendChild(inputRow('Corporate Website *', webInput));
-
-    // Remove Description field entirely (was here previously)
 
     app.appendChild(el('div', { class:'small' }, 'Fields marked * are required.'));
 
@@ -111,13 +107,21 @@ const pages = {
   },
 
   // =====================
-  // Page 2 — Sites
+  // Page 2 — Sites (Step 3 changes here)
   // =====================
   2: function sites(){
     const p = state.payload?.page2 || { sites: [] };
+
+    // NEW: helper label
+    const header = el('div', { class:'card' },
+      el('h2', {}, 'Sites'),
+      el('p', { class:'help' }, 'Enter your owned and operated sites.')
+    );
+
     const table = el('table', { class:'table' });
     const head = el('tr', {}, el('th', {}, 'Site Name'), el('th', {}, 'URL'), el('th', {}, ''));
     const tbody = el('tbody');
+
     function render(){
       tbody.innerHTML='';
       p.sites.forEach((s,i)=>{
@@ -129,8 +133,11 @@ const pages = {
         tbody.appendChild(tr);
       });
     }
-    const nameI = textField({});
-    const urlI  = textField({ placeholder:'https://...' });
+
+    // NEW: placeholder/help text for Site Name
+    const nameI = textField({ placeholder:'Site name (e.g., YourSite.com)' });
+    const urlI  = textField({ placeholder:'https://www.yoursite.com' });
+
     const addBtn = el('button', { class:'btn', onclick:()=>{
       const u = urlNormalize(urlI.value);
       if(!nameI.value || !u){ alert('Provide site name and URL'); return; }
@@ -140,7 +147,12 @@ const pages = {
     table.appendChild(el('thead', {}, head));
     table.appendChild(tbody);
 
-    app.appendChild(el('div', { class:'card' }, el('h2', {}, 'Sites'), el('div', { class:'row' }, nameI, urlI, addBtn), table));
+    app.appendChild(header);
+    app.appendChild(el('div', { class:'card' },
+      el('div', { class:'row' }, nameI, urlI, addBtn),
+      table
+    ));
+
     render();
 
     app.appendChild(btnRow(1,3,{ onPrev:()=>routeTo(1), onNext: async()=>{
@@ -150,7 +162,7 @@ const pages = {
   },
 
   // =====================
-  // Page 3 — Contacts
+  // Page 3 — Contacts (unchanged here)
   // =====================
   3: function contacts(){
     const p = state.payload?.page3 || { contacts: [] };
