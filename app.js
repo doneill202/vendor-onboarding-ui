@@ -1,13 +1,10 @@
-
 import { getReference, initDraft, savePage, getSasForTax, uploadWithSas, submitDraft } from './api.js';
 import { el, inputRow, multiSelect, textField, urlNormalize } from './components.js';
 import { SETTINGS } from './config.js';
 
-// Root nodes
 const app = document.getElementById('app');
 const nav = document.getElementById('stepsNav');
 
-// Steps
 const steps = [
   { id:1, key:'profile', title:'Profile' },
   { id:2, key:'sites', title:'Sites' },
@@ -19,14 +16,13 @@ const steps = [
   { id:8, key:'review', title:'Review & Submit' }
 ];
 
-// App state
 let ref = null; // reference data
-let state = { draftId:null, step:1, vendorToken:null, inviterEmail:'', payload:{}, invite:null };
+let state = { draftId:null, step:1, vendorToken:null, inviterEmail:'', payload:{} };
 
-// Utils
 function qs(name){ return new URL(window.location).searchParams.get(name); }
 function saveLocal(){ if(state.draftId) localStorage.setItem('intnt_draft_'+state.draftId, JSON.stringify(state)); }
 function loadLocal(did){ const s = localStorage.getItem('intnt_draft_'+did); if(s) { try { return JSON.parse(s); } catch { return null; } } return null; }
+
 function sortByTitle(list){ return (list||[]).slice().sort((a,b)=> String(a.title).localeCompare(String(b.title))); }
 
 function renderNav(){
@@ -39,60 +35,30 @@ function renderNav(){
   });
 }
 
-// Bootstrap
 async function bootstrap(){
   try{
-    const vendorToken = qs('vendorToken');
+    const vendorToken = qs('vendorToken') || 'test-token-123';
     const inviterEmail = qs('inviterEmail') || '';
-
-    // Block flow if no vendorToken present
-    if(!vendorToken){
-      if(nav) nav.style.display = 'none';
-      app.innerHTML = '';
-      const box = el('div', { class:'card' },
-        el('h2', {}, 'Vendor Onboarding'),
-        el('p', {}, "If you'd like to apply to be a vendor for Intnt, please email "),
-        el('p', { class:'small' }, el('a',{ href:'mailto:media@adquire.com' }, 'media@adquire.com'))
-      );
-      app.appendChild(box);
-      return; // stop initialization
-    }
-
     state.vendorToken = vendorToken; state.inviterEmail = inviterEmail;
 
-    // Load reference data and init draft
     ref = (await getReference()).data || (await getReference());
     const init = (await initDraft(vendorToken, inviterEmail)).data || (await initDraft(vendorToken, inviterEmail));
 
     state.draftId = init.draftId; state.step = init.step || 1; state.payload = init.payload || {};
-    // Capture invite if backend returned it (preferred); fall back to older fields if present
-    state.invite = init.invite || {
-      firstName: init.firstName || '',
-      lastName:  init.lastName  || '',
-      email:     init.email     || init.inviterEmail || ''
-    };
 
-    // Merge cached state but preserve freshly fetched invite if cache had none
-    const cached = loadLocal(state.draftId);
-    if(cached){
-      const keepInvite = state.invite;
-      state = { ...state, ...cached };
-      if((!('invite' in cached) || !cached.invite) && keepInvite){ state.invite = keepInvite; }
-    }
+    const cached = loadLocal(state.draftId); if(cached){ const keepInvite = state.invite; state = { ...state, ...cached }; if((!('invite' in cached) || !cached.invite) && keepInvite){ state.invite = keepInvite; } }
 
     renderNav();
     routeTo(state.step);
   }catch(e){
     app.innerHTML='';
-    app.appendChild(el('div', { class:'card msg err' }, 'Failed to initialize. '+ (e?.message||'')));
+    app.appendChild(el('div', { class:'card msg err' }, 'Failed to initialize. ', e.message));
   }
 }
 
 function routeTo(stepId){
   state.step = stepId; renderNav(); window.location.hash = '#'+stepId; app.innerHTML='';
   const page = pages[stepId]; if(page) page(); saveLocal();
-  // Scroll to top on page navigation only
-  try{ window.scrollTo(0,0); }catch{}
 }
 
 function btnRow(prev, next, {hidePrev=false, onPrev=null, onNext=null, nextText='Save & Next'}={}){
@@ -119,25 +85,19 @@ function showThanks(){
   app.appendChild(box);
 }
 
-// Pages
 const pages = {
-  // 1) Profile
   1: function profile(){
     const p = state.payload?.page1 || {};
-
     const welcome = el('div', { class:'card' },
       el('h2', {}, 'Company Profile'),
       el('p', { class:'help' }, 'Thanks for filling out your company profile. You can exit at any time and return using the link from your email to continue where you left off.')
     );
     app.appendChild(welcome);
-
     const nameInput = textField({ value: p.companyName || '', oninput:v=> p.companyName = v });
-    const webInput  = textField({ type:'url', value: p.website || '', oninput:v=> p.website = v, placeholder:'www.corporate.com' });
-
+    const webInput  = textField({ type:'url', value: p.website || '', oninput:v=> p.website = v, placeholder:'https://example.com' });
     app.appendChild(inputRow('Company Name *', nameInput));
     app.appendChild(inputRow('Corporate Website *', webInput));
     app.appendChild(el('div', { class:'small' }, 'Fields marked * are required.'));
-
     app.appendChild(btnRow(1,2,{ hidePrev:true, nextText:'Save & Continue', onNext: async()=>{
       p.website = urlNormalize(p.website);
       if(!p.companyName || !p.website){ alert('Please provide Company Name and Corporate Website.'); return; }
@@ -146,123 +106,55 @@ const pages = {
     }}));
   },
 
-  // 2) Sites
   2: function sites(){
     const p = state.payload?.page2 || { sites: [] };
     const header = el('div', { class:'card' }, el('h2', {}, 'Sites'), el('p', { class:'help' }, 'Enter your owned and operated sites.'));
-
     const table = el('table', { class:'table' });
     const head = el('tr', {}, el('th', {}, 'Site Name'), el('th', {}, 'URL'), el('th', {}, ''));
     const tbody = el('tbody');
-
-    function render(){
-      tbody.innerHTML='';
-      if(!Array.isArray(p.sites) || p.sites.length===0){
-        const tr = el('tr',{}, el('td',{colspan:'3',class:'small'}, 'Add sites using the form above.'));
-        tbody.appendChild(tr);
-        return;
-      }
-      p.sites.forEach((s,i)=>{
-        const tr = el('tr', {},
-          el('td', {}, s.siteName || ''),
-          el('td', {}, s.url || ''),
-          el('td', {}, el('button', { class:'btn', onclick:()=>{ p.sites.splice(i,1); render(); } }, 'Remove'))
-        );
-        tbody.appendChild(tr);
-      });
-    }
-
-    const nameI = textField({ placeholder:'Site name (e.g. YourSite)' });
-    const urlI  = textField({ placeholder:'www.yoursite.com' });
-    const addBtn = el('button', { class:'btn', onclick:()=>{ const u=urlNormalize(urlI.value); if(!nameI.value || !u){ alert('Provide site name and URL'); return; } p.sites.push({ siteName:nameI.value, url:u }); nameI.value=''; urlI.value=''; render(); } }, 'Add');
-
+    function render(){ tbody.innerHTML=''; (p.sites||[]).forEach((s,i)=>{
+      const tr = el('tr', {}, el('td', {}, s.siteName||''), el('td', {}, s.url||''), el('td', {}, el('button', { class:'btn', onclick:()=>{ p.sites.splice(i,1); render(); } }, 'Remove')) ); tbody.appendChild(tr);
+    }); }
+    const nameI = textField({ placeholder:'Site name (e.g., YourSite.com)' });
+    const urlI  = textField({ placeholder:'https://www.yoursite.com' });
+    const addBtn = el('button', { class:'btn', onclick:()=>{ const u=urlNormalize(urlI.value); if(!nameI.value||!u){ alert('Provide site name and URL'); return; } p.sites.push({ siteName:nameI.value, url:u }); nameI.value=''; urlI.value=''; render(); } }, 'Add');
     table.appendChild(el('thead', {}, head)); table.appendChild(tbody);
     app.appendChild(header);
-    app.appendChild(el('div', { class:'card' },
-      el('div', { class:'row' }, nameI, urlI, addBtn),
-      el('div',{style:'height:30px'}),
-      table
-    ));
+    app.appendChild(el('div', { class:'card' }, el('div', { class:'row' }, nameI, urlI, addBtn), table ));
     render();
-
     app.appendChild(btnRow(1,3,{ onPrev:()=>routeTo(1), onNext: async()=>{ if(!Array.isArray(p.sites)||p.sites.length<1){ alert('Please add at least one site.'); return; } state.payload=state.payload||{}; state.payload.page2=p; saveLocal(); await savePage(state.draftId,2,p); routeTo(3); }}));
   },
 
-  // 3) Contacts
   3: function contacts(){
     const p = state.payload?.page3 || { contacts: [] };
-
     const table = el('table', { class:'table' });
-    const thead = el('thead', {}, el('tr', {},
-      el('th', {style:'width:24%'}, 'Name'),
-      el('th', {style:'width:28%'}, 'Email'),
-      el('th', {style:'width:22%'}, 'Phone'),
-      el('th', {style:'width:10%'}, 'Primary'),
-      el('th', {style:'width:10%'}, 'Accounting'),
-      el('th', {style:'width:6%'},  'Mobile'),
-      el('th', {}, '') ));
+    const thead = el('thead', {}, el('tr', {}, el('th', {}, 'Name'), el('th', {}, 'Email'), el('th', {}, 'Phone'), el('th', {}, 'Is Primary Contact'), el('th', {}, 'Is Accounting Contact'), el('th', {}, 'Mobile'), el('th', {}, '') ));
     const tbody = el('tbody');
-
-    function render(){
-      tbody.innerHTML='';
-      if(!Array.isArray(p.contacts) || p.contacts.length===0){
-        const tr = el('tr',{}, el('td',{colspan:'7',class:'small'}, 'Add contacts using the form above.'));
-        tbody.appendChild(tr);
-        return;
-      }
-      (p.contacts||[]).forEach((c,i)=>{
-        const tr=el('tr', {},
-          el('td', {}, `${(c.firstName||'')} ${(c.lastName||'')}`.trim()),
-          el('td', {}, c.email||''),
-          el('td', {}, c.phone||''),
-          el('td', {}, c.isPrimary?'Yes':''),
-          el('td', {}, c.isAccounting?'Yes':''),
-          el('td', {}, c.isMobile?'Mobile':''),
-          el('td', {}, el('button',{class:'btn',onclick:()=>{p.contacts.splice(i,1);render();}},'Remove')) );
-        tbody.appendChild(tr);
-      });
-    }
-
-    const f  = textField({ placeholder:'First name' });
-    const l  = textField({ placeholder:'Last name'  });
-    const e  = textField({ type:'email', placeholder:'email@domain.com' });
-
-    // Prefill once if no contacts yet
-    try{
-      if((p.contacts||[]).length===0){
-        const inv = state?.invite || {};
-        if(inv.firstName) f.value = inv.firstName;
-        if(inv.lastName)  l.value = inv.lastName;
-        if(inv.email)     e.value = inv.email;
-      }
-    }catch{}
-
-    const ph = textField({ placeholder:'Phone (optional)' }); ph.style.maxWidth='280px';
+    function render(){ tbody.innerHTML=''; (p.contacts||[]).forEach((c,i)=>{ const tr=el('tr', {}, el('td', {}, `${(c.firstName||'')} ${(c.lastName||'')}`.trim()), el('td', {}, c.email||''), el('td', {}, c.phone||''), el('td', {}, c.isPrimary?'Yes':''), el('td', {}, c.isAccounting?'Yes':''), el('td', {}, c.isMobile?'Mobile':''), el('td', {}, el('button',{class:'btn',onclick:()=>{p.contacts.splice(i,1);render();}},'Remove')) ); tbody.appendChild(tr); }); }
+    const f=textField({ placeholder:'First name' });
+    const l=textField({ placeholder:'Last name' });
+    const e=textField({ type:'email', placeholder:'email@domain.com' });
+    const ph=textField({ placeholder:'Phone (optional)' }); ph.style.maxWidth='280px';
     const prim=el('input',{type:'checkbox'}); const acct=el('input',{type:'checkbox'}); const mob=el('input',{type:'checkbox'});
-
     const add=el('button',{class:'btn',onclick:()=>{ if(!f.value||!l.value||!e.value){ alert('Provide first, last, and email'); return; } p.contacts.push({ firstName:f.value,lastName:l.value,email:e.value,phone:ph.value||'',isPrimary:prim.checked,isAccounting:acct.checked,isMobile:mob.checked }); f.value=l.value=e.value=ph.value=''; prim.checked=acct.checked=mob.checked=false; render(); }},'Add');
-
     table.appendChild(thead); table.appendChild(tbody); render();
-
     app.appendChild(el('div',{class:'card'},
       el('h2',{},'Contacts'),
       el('div',{class:'row',style:'margin-bottom:8px;'}, f,l,e),
       el('div',{class:'row kv',style:'margin-bottom:8px;'}, ph, el('label',{}, el('input',{type:'checkbox',onchange:ev=>{mob.checked=ev.target.checked;}}),' Is Mobile')),
       el('div',{class:'row',style:'margin-bottom:8px;'},
         el('label',{}, el('input',{type:'checkbox',onchange:ev=>{prim.checked=ev.target.checked;}}),' Is Primary Contact'),
-        el('label',{}, el('input',{type:'checkbox',onchange:ev=>{acct.checked=ev.target.checked;}}),' Is Accounting Contact')
+        el('label',{}, el('input',{type:'checkbox',onchange:ev=>{acct.checked=ev.target.checked;}}),' Is Accounting Contact'),
+        add
       ),
-      el('div',{class:'row',style:'margin-bottom:30px;'}, add),
       table
     ));
-
     app.appendChild(btnRow(2,4,{ onPrev:()=>routeTo(2), onNext: async()=>{ if(!Array.isArray(p.contacts)||p.contacts.length<1){ alert('Please add at least one contact.'); return; } state.payload=state.payload||{}; state.payload.page3=p; saveLocal(); await savePage(state.draftId,3,p); routeTo(4); }}));
   },
 
-  // 4) Tax
   4: function tax(){
     const p = state.payload?.page4 || { taxDoc:null };
-    const header = el('div', { class:'card' }, el('h2', {}, 'Tax Document (W-9/W-8)'), el('p', { class:'help' }, "Upload your company’s tax document (optional)."));
+    const header = el('div', { class:'card' }, el('h2', {}, 'Tax Document (W-9/W-8)'), el('p', { class:'help' }, "Upload your companyâ€™s tax document (optional)."));
     const info = el('div', { class:'small' }, SETTINGS.taxOptional? 'This step is optional. PDF up to 10 MB.' : 'PDF up to 10 MB is required.');
     const file = el('input', { type:'file', accept:'application/pdf' });
     const status = el('div', { class:'small' }); if(p.taxDoc){ status.textContent=`Current: ${p.taxDoc.fileName}`; }
@@ -274,40 +166,25 @@ const pages = {
     }}));
   },
 
-  // 5) Demographics + Check All
   5: function demographics(){
     const p = state.payload?.page5 || { percentFemale:50, ageBracketIds:[], lifeStageIds:[], incomeBracketIds:[] };
     const header = el('div', { class:'card' }, el('h2', {}, 'Demographics'), el('p', { class:'help' }, 'Please describe the audience of your site(s).'));
-
     const ageList = ref.ageBrackets||[]; const lifeList=ref.lifeStages||[]; const incList=ref.householdIncomeBrackets||[];
     const pf=el('input',{type:'range',min:'0',max:'100',value:(p.percentFemale??50),class:'slider'}); const pfVal=el('span',{class:'badge'},`${(p.percentFemale??50)}%`); pf.addEventListener('input',ev=>{ p.percentFemale=parseInt(ev.target.value,10); pfVal.textContent=p.percentFemale+'%'; });
-
-    function buildMulti(){
-      sectA.innerHTML=''; sectL.innerHTML=''; sectI.innerHTML='';
-      const selA=[]; (p.ageBracketIds||[]).forEach(id=>{ const o=ageList.find(x=>x.id===id); if(o) selA.push(o); });
-      const selL=[]; (p.lifeStageIds||[]).forEach(id=>{ const o=lifeList.find(x=>x.id===id); if(o) selL.push(o); });
-      const selI=[]; (p.incomeBracketIds||[]).forEach(id=>{ const o=incList.find(x=>x.id===id); if(o) selI.push(o); });
-      sectA.appendChild(multiSelect(ageList, selA, sel=>{ p.ageBracketIds=sel.map(x=>x.id); }));
-      sectL.appendChild(multiSelect(lifeList, selL, sel=>{ p.lifeStageIds=sel.map(x=>x.id); }));
-      sectI.appendChild(multiSelect(incList, selI, sel=>{ p.incomeBracketIds=sel.map(x=>x.id); }));
-    }
-
-    const sectA = el('div');
-    const sectL = el('div');
-    const sectI = el('div');
-
+    const selA=[]; (p.ageBracketIds||[]).forEach(id=>{ const o=ageList.find(x=>x.id===id); if(o) selA.push(o); });
+    const selL=[]; (p.lifeStageIds||[]).forEach(id=>{ const o=lifeList.find(x=>x.id===id); if(o) selL.push(o); });
+    const selI=[]; (p.incomeBracketIds||[]).forEach(id=>{ const o=incList.find(x=>x.id===id); if(o) selI.push(o); });
+    const uiA=multiSelect(ageList, selA, sel=>{ p.ageBracketIds=sel.map(x=>x.id); });
+    const uiL=multiSelect(lifeList, selL, sel=>{ p.lifeStageIds=sel.map(x=>x.id); });
+    const uiI=multiSelect(incList, selI, sel=>{ p.incomeBracketIds=sel.map(x=>x.id); });
     app.appendChild(header);
     app.appendChild(el('div',{class:'card'}, el('div',{class:'row'}, el('label',{},'Percent Female'), pf, pfVal)));
-    app.appendChild(el('div',{class:'card'}, el('h3',{},'Age Brackets (select at least one)'), sectA, el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.ageBracketIds = (ageList||[]).map(x=>x.id); buildMulti(); }}, 'Check All')) ));
-    app.appendChild(el('div',{class:'card'}, el('h3',{},'Life Stages (select at least one)'), sectL, el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.lifeStageIds = (lifeList||[]).map(x=>x.id); buildMulti(); }}, 'Check All')) ));
-    app.appendChild(el('div',{class:'card'}, el('h3',{},'Household Income Brackets (select at least one)'), sectI, el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.incomeBracketIds = (incList||[]).map(x=>x.id); buildMulti(); }}, 'Check All')) ));
-
-    buildMulti();
-
+    app.appendChild(el('div',{class:'card'}, el('h3',{},'Age Brackets (select at least one)'), uiA));
+    app.appendChild(el('div',{class:'card'}, el('h3',{},'Life Stages (select at least one)'), uiL));
+    app.appendChild(el('div',{class:'card'}, el('h3',{},'Household Income Brackets (select at least one)'), uiI));
     app.appendChild(btnRow(4,6,{ onPrev:()=>routeTo(4), onNext: async()=>{ if(!p.ageBracketIds?.length||!p.lifeStageIds?.length||!p.incomeBracketIds?.length){ alert('Please select at least one in each section.'); return; } state.payload=state.payload||{}; state.payload.page5=p; saveLocal(); await savePage(state.draftId,5,p); routeTo(6); }}));
   },
 
-  // 6) Interests + Check/Uncheck All
   6: function interests(){
     const p = state.payload?.page6 || { interestsAndIntentIds:[] };
     const header = el('div', { class:'card' }, el('h2', {}, 'Interests & Intent'), el('p', { class:'help' }, 'Please select the types of campaigns that resonate with your audience.'));
@@ -315,43 +192,29 @@ const pages = {
     const selected=[]; (p.interestsAndIntentIds||[]).forEach(id=>{ const o=list.find(x=>x.id===id); if(o) selected.push(o); });
     const uiBox=el('div'); function buildUi(){ uiBox.innerHTML=''; uiBox.appendChild(multiSelect(list, selected, sel=>{ p.interestsAndIntentIds=sel.map(x=>x.id); })); } buildUi();
     const checkAllBtn=el('button',{class:'btn',onclick:()=>{ selected.splice(0,selected.length,...list); p.interestsAndIntentIds=list.map(x=>x.id); buildUi(); }},'Check All');
-    const clearAllBtn=el('button',{class:'btn ghost',onclick:()=>{ selected.splice(0,selected.length); p.interestsAndIntentIds=[]; buildUi(); }},'Uncheck All');
     app.appendChild(header);
-    app.appendChild(el('div',{class:'card'}, uiBox, el('div',{class:'row'}, checkAllBtn, clearAllBtn)));
+    app.appendChild(el('div',{class:'card'}, uiBox, el('div',{class:'row'}, checkAllBtn)));
     app.appendChild(btnRow(5,7,{ onPrev:()=>routeTo(5), onNext: async()=>{ if(!p.interestsAndIntentIds||p.interestsAndIntentIds.length<SETTINGS.minInterests){ alert(`Please select at least ${SETTINGS.minInterests}`); return; } state.payload=state.payload||{}; state.payload.page6=p; saveLocal(); await savePage(state.draftId,6,p); routeTo(7); }}));
   },
 
-  // 7) Capabilities — section-local Check All (no page jump)
   7: function capabilities(){
     const p = state.payload?.page7 || { adTypeIds:[], pricingTypeIds:[], targetingIds:[], campaignFunctionalityIds:[], regionIds:[] };
     function selFrom(list, ids){ const s=[]; (ids||[]).forEach(id=>{ const o=list.find(x=>x.id===id); if(o) s.push(o); }); return s; }
     const adList=sortByTitle(ref.adTypes||[]); const pricingList=sortByTitle(ref.pricingTypes||[]); const targList=sortByTitle(ref.targeting||[]); const campList=sortByTitle(ref.campaignFunctionality||[]); const regionList=sortByTitle(ref.regions||[]);
-
-    // Build per-section containers to rebuild in-place (no routeTo)
-    const sectAd=el('div'), sectPr=el('div'), sectTa=el('div'), sectCa=el('div'), sectRe=el('div');
-
-    function buildCaps(){
-      sectAd.innerHTML = sectPr.innerHTML = sectTa.innerHTML = sectCa.innerHTML = sectRe.innerHTML = '';
-      const selAd = selFrom(adList, p.adTypeIds); sectAd.appendChild(multiSelect(adList, selAd, sel=>{ p.adTypeIds=sel.map(x=>x.id); }));
-      const selPr = selFrom(pricingList, p.pricingTypeIds); sectPr.appendChild(multiSelect(pricingList, selPr, sel=>{ p.pricingTypeIds=sel.map(x=>x.id); }));
-      const selTa = selFrom(targList, p.targetingIds); sectTa.appendChild(multiSelect(targList, selTa, sel=>{ p.targetingIds=sel.map(x=>x.id); }));
-      const selCa = selFrom(campList, p.campaignFunctionalityIds); sectCa.appendChild(multiSelect(campList, selCa, sel=>{ p.campaignFunctionalityIds=sel.map(x=>x.id); }));
-      const selRe = selFrom(regionList, p.regionIds); sectRe.appendChild(multiSelect(regionList, selRe, sel=>{ p.regionIds=sel.map(x=>x.id); }));
-    }
-
+    const ad=multiSelect(adList, selFrom(adList,p.adTypeIds), sel=>{ p.adTypeIds=sel.map(x=>x.id); });
+    const pricing=multiSelect(pricingList, selFrom(pricingList,p.pricingTypeIds), sel=>{ p.pricingTypeIds=sel.map(x=>x.id); });
+    const targeting=multiSelect(targList, selFrom(targList,p.targetingIds), sel=>{ p.targetingIds=sel.map(x=>x.id); });
+    const camp=multiSelect(campList, selFrom(campList,p.campaignFunctionalityIds), sel=>{ p.campaignFunctionalityIds=sel.map(x=>x.id); });
+    const regions=multiSelect(regionList, selFrom(regionList,p.regionIds), sel=>{ p.regionIds=sel.map(x=>x.id); });
     app.appendChild(el('div',{class:'card'}, el('h2',{},'Capabilities'), el('p',{class:'help'},'Please describe your advertising capabilities.')));
-    app.appendChild(el('div',{class:'card'}, el('h3',{},'Ad Types (please select at least one)'), sectAd, el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.adTypeIds = adList.map(x=>x.id); buildCaps(); }}, 'Check All') )));
-    app.appendChild(el('div',{class:'card'}, el('h3',{},'Pricing Types (please select at least one)'), sectPr, el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.pricingTypeIds = pricingList.map(x=>x.id); buildCaps(); }}, 'Check All') )));
-    app.appendChild(el('div',{class:'card'}, el('h3',{},'Targeting (please select at least one)'), sectTa, el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.targetingIds = targList.map(x=>x.id); buildCaps(); }}, 'Check All') )));
-    app.appendChild(el('div',{class:'card'}, el('h3',{},'Campaign Functionality (please select at least one)'), sectCa, el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.campaignFunctionalityIds = campList.map(x=>x.id); buildCaps(); }}, 'Check All') )));
-    app.appendChild(el('div',{class:'card'}, el('h3',{},'Regions (please select at least one)'), sectRe, el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.regionIds = regionList.map(x=>x.id); buildCaps(); }}, 'Check All') )));
-
-    buildCaps();
-
+    app.appendChild(el('div',{class:'card'}, el('h3',{},'Ad Types (please select at least one)'), ad));
+    app.appendChild(el('div',{class:'card'}, el('h3',{},'Pricing Types (please select at least one)'), pricing));
+    app.appendChild(el('div',{class:'card'}, el('h3',{},'Targeting (please select at least one)'), targeting));
+    app.appendChild(el('div',{class:'card'}, el('h3',{},'Campaign Functionality (please select at least one)'), camp));
+    app.appendChild(el('div',{class:'card'}, el('h3',{},'Regions (please select at least one)'), regions));
     app.appendChild(btnRow(6,8,{ onPrev:()=>routeTo(6), nextText:'Save & Review', onNext: async()=>{ const ok=p.adTypeIds?.length&&p.pricingTypeIds?.length&&p.targetingIds?.length&&p.campaignFunctionalityIds?.length&&p.regionIds?.length; if(!ok){ alert('Please select at least one in each section.'); return; } state.payload=state.payload||{}; state.payload.page7=p; saveLocal(); await savePage(state.draftId,7,p); routeTo(8); }}));
   },
 
-  // 8) Review
   8: function review(){
     const tbl = el('table', { class:'table', style:'width:100%; background:transparent; border:0;' });
     const tbody = el('tbody');
@@ -389,6 +252,5 @@ const pages = {
   }
 };
 
-// Router
 window.addEventListener('hashchange', ()=>{ const h=location.hash.replace('#',''); if(h==='done'){ showThanks(); return; } const s=parseInt(h||state.step,10); if(steps.some(x=>x.id===s)) routeTo(s); });
 bootstrap();
