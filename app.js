@@ -1,6 +1,6 @@
 /**
  * Intnt Vendor Onboarding (External)
- * app.js — ALL CORRECTED
+ * app.js – ALL CORRECTED
  * Date: 2026-02-04
  */
 
@@ -321,7 +321,7 @@ const pages = {
 
     const header = el('div', { class:'card' },
       el('h2', {}, 'Tax Document (W-9/W-8)'),
-      el('p', { class:'help' }, "Upload your company’s tax document (optional).")
+      el('p', { class:'help' }, "Upload your company's tax document (optional).")
     );
 
     const info = el('div', { class:'small' }, SETTINGS.taxOptional? 'This step is optional. PDF up to 10 MB.' : 'PDF up to 10 MB is required.');
@@ -443,27 +443,30 @@ const pages = {
     }));
   },
 
-  // 7) Capabilities — section-local Check All (no page jump)
+  // 7) Capabilities – UPDATED to split Ad Types into CoReg and Display
   7: function capabilities(){
-    const p = state.payload?.page7 || { adTypeIds:[], pricingTypeIds:[], targetingIds:[], campaignFunctionalityIds:[], regionIds:[] };
+    const p = state.payload?.page7 || { coregAdTypeIds:[], displayAdTypeIds:[], pricingTypeIds:[], targetingIds:[], campaignFunctionalityIds:[], regionIds:[] };
 
-    const adList     = sortByTitle(ref.adTypes||[]);
+    const coregAdList    = sortByTitle(ref.coRegAdTypes||[]);
+    const displayAdList  = sortByTitle(ref.displayAdTypes||[]);
     const pricingList= sortByTitle(ref.pricingTypes||[]);
     const targList   = sortByTitle(ref.targeting||[]);
     const campList   = sortByTitle(ref.campaignFunctionality||[]);
     const regionList = sortByTitle(ref.regions||[]);
 
-    const sectAd=el('div'), sectPr=el('div'), sectTa=el('div'), sectCa=el('div'), sectRe=el('div');
+    const sectCoRegAd=el('div'), sectDisplayAd=el('div'), sectPr=el('div'), sectTa=el('div'), sectCa=el('div'), sectRe=el('div');
 
     function buildCaps(){
-      sectAd.innerHTML = sectPr.innerHTML = sectTa.innerHTML = sectCa.innerHTML = sectRe.innerHTML = '';
-      const selAd = []; (p.adTypeIds||[]).forEach(id=>{ const o=adList.find(x=>x.id===id); if(o) selAd.push(o); });
+      sectCoRegAd.innerHTML = sectDisplayAd.innerHTML = sectPr.innerHTML = sectTa.innerHTML = sectCa.innerHTML = sectRe.innerHTML = '';
+      const selCoRegAd = []; (p.coregAdTypeIds||[]).forEach(id=>{ const o=coregAdList.find(x=>x.id===id); if(o) selCoRegAd.push(o); });
+      const selDisplayAd = []; (p.displayAdTypeIds||[]).forEach(id=>{ const o=displayAdList.find(x=>x.id===id); if(o) selDisplayAd.push(o); });
       const selPr = []; (p.pricingTypeIds||[]).forEach(id=>{ const o=pricingList.find(x=>x.id===id); if(o) selPr.push(o); });
       const selTa = []; (p.targetingIds||[]).forEach(id=>{ const o=targList.find(x=>x.id===id); if(o) selTa.push(o); });
       const selCa = []; (p.campaignFunctionalityIds||[]).forEach(id=>{ const o=campList.find(x=>x.id===id); if(o) selCa.push(o); });
       const selRe = []; (p.regionIds||[]).forEach(id=>{ const o=regionList.find(x=>x.id===id); if(o) selRe.push(o); });
 
-      sectAd.appendChild(multiSelect(adList,      selAd, sel=>{ p.adTypeIds                 = sel.map(x=>x.id); }));
+      sectCoRegAd.appendChild(multiSelect(coregAdList,      selCoRegAd, sel=>{ p.coregAdTypeIds                 = sel.map(x=>x.id); }));
+      sectDisplayAd.appendChild(multiSelect(displayAdList,  selDisplayAd, sel=>{ p.displayAdTypeIds            = sel.map(x=>x.id); }));
       sectPr.appendChild(multiSelect(pricingList, selPr, sel=>{ p.pricingTypeIds            = sel.map(x=>x.id); }));
       sectTa.appendChild(multiSelect(targList,    selTa, sel=>{ p.targetingIds              = sel.map(x=>x.id); }));
       sectCa.appendChild(multiSelect(campList,    selCa, sel=>{ p.campaignFunctionalityIds  = sel.map(x=>x.id); }));
@@ -473,9 +476,14 @@ const pages = {
     app.appendChild(el('div',{class:'card'}, el('h2',{},'Capabilities'), el('p',{class:'help'},'Please describe your advertising capabilities.')));
 
     app.appendChild(el('div',{class:'card'},
-      el('h3',{},'Ad Types (please select at least one)'),
-      sectAd,
-      el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.adTypeIds = adList.map(x=>x.id); buildCaps(); }}, 'Check All'))
+      el('h3',{},'CoReg Ad Types (please select at least one from CoReg or Display)'),
+      sectCoRegAd,
+      el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.coregAdTypeIds = coregAdList.map(x=>x.id); buildCaps(); }}, 'Check All'))
+    ));
+    app.appendChild(el('div',{class:'card'},
+      el('h3',{},'Display Ad Types (please select at least one from CoReg or Display)'),
+      sectDisplayAd,
+      el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.displayAdTypeIds = displayAdList.map(x=>x.id); buildCaps(); }}, 'Check All'))
     ));
     app.appendChild(el('div',{class:'card'},
       el('h3',{},'Pricing Types (please select at least one)'),
@@ -504,14 +512,14 @@ const pages = {
       onPrev:()=>routeTo(6),
       nextText:'Save & Review',
       onNext: async()=>{
-        const ok = p.adTypeIds?.length && p.pricingTypeIds?.length && p.targetingIds?.length && p.campaignFunctionalityIds?.length && p.regionIds?.length;
-        if(!ok){ alert('Please select at least one in each section.'); return; }
+        const ok = (p.coregAdTypeIds?.length || p.displayAdTypeIds?.length) && p.pricingTypeIds?.length && p.targetingIds?.length && p.campaignFunctionalityIds?.length && p.regionIds?.length;
+        if(!ok){ alert('Please select at least one in each section (CoReg or Display Ad Types required).'); return; }
         state.payload=state.payload||{}; state.payload.page7=p; saveLocal(); await savePage(state.draftId,7,p); routeTo(8);
       }
     }));
   },
 
-  // 8) Review
+  // 8) Review – UPDATED to show both CoReg and Display Ad Types
   8: function review(){
     const tbl = el('table', { class:'table', style:'width:100%; background:transparent; border:0;' });
     const tbody = el('tbody');
@@ -536,7 +544,8 @@ const pages = {
     row('Life Stages', titlesFrom(ref.lifeStages, p5.lifeStageIds).join(', ') || 'None');
     row('Household Income', titlesFrom(ref.householdIncomeBrackets, p5.incomeBracketIds).join(', ') || 'None');
     const p6=state.payload?.page6||{}; row('Interests', titlesFrom(ref.interestsAndIntent, p6.interestsAndIntentIds).join(', ') || 'None');
-    const p7=state.payload?.page7||{}; row('Ad Types', titlesFrom(ref.adTypes, p7.adTypeIds).join(', ') || 'None');
+    const p7=state.payload?.page7||{}; row('CoReg Ad Types', titlesFrom(ref.coRegAdTypes, p7.coregAdTypeIds).join(', ') || 'None');
+    row('Display Ad Types', titlesFrom(ref.displayAdTypes, p7.displayAdTypeIds).join(', ') || 'None');
     row('Pricing Types', titlesFrom(ref.pricingTypes, p7.pricingTypeIds).join(', ') || 'None');
     row('Targeting', titlesFrom(ref.targeting, p7.targetingIds).join(', ') || 'None');
     row('Campaign Func', titlesFrom(ref.campaignFunctionality, p7.campaignFunctionalityIds).join(', ') || 'None');
