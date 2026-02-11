@@ -1,7 +1,10 @@
 /**
  * Intnt Vendor Onboarding (External)
- * app.js – ALL CORRECTED
- * Date: 2026-02-04
+ * app.js
+ * Date: 2026-02-11
+ * Changes: Added TimeZone (page 1), Site Notes (page 2), IsAdOps (page 3),
+ *          Platform + CoReg/Display AdTypes (page 7), updated review (page 8)
+ *          Company Name prepopulated from invite
  */
 
 import { getReference, initDraft, savePage, getSasForTax, uploadWithSas, submitDraft } from './api.js';
@@ -76,9 +79,10 @@ async function bootstrap(){
 
     // Capture invite from server this run (preferred); fall back to legacy fields if present
     state.invite = init.invite || {
-      firstName: init.firstName || '',
-      lastName:  init.lastName  || '',
-      email:     init.email     || init.inviterEmail || ''
+      firstName:   init.firstName   || '',
+      lastName:    init.lastName    || '',
+      email:       init.email       || init.inviterEmail || '',
+      companyName: init.companyName || ''
     };
 
     // Merge cached state but PRESERVE server invite when cache has none or is empty ({} with no fields)
@@ -135,6 +139,7 @@ function showThanks(){
 // Pages
 const pages = {
   // 1) Profile
+  // CHANGED: Added TimeZone dropdown, prepopulate Company Name from invite
   1: function profile(){
     const p = state.payload?.page1 || {};
 
@@ -144,11 +149,30 @@ const pages = {
     );
     app.appendChild(welcome);
 
-    const nameInput = textField({ value: p.companyName || '', oninput:v=> p.companyName = v });
-    const webInput  = textField({ type:'url', value: p.website || '', oninput:v=> p.website = v, placeholder:'www.corporate.com' });
+    // Company Name - prepopulate from invite if available
+    const nameInput = textField({
+      value: p.companyName || state.invite?.companyName || '',
+      oninput:v=> p.companyName = v
+    });
+    // Ensure p.companyName is set if prefilled from invite
+    if(!p.companyName && state.invite?.companyName) p.companyName = state.invite.companyName;
 
-    app.appendChild(inputRow('Company Name *',     nameInput));
+    const webInput = textField({ type:'url', value: p.website || '', oninput:v=> p.website = v, placeholder:'www.corporate.com' });
+
+    // TimeZone dropdown (NEW)
+    const tzList = ref.timeZones || [];
+    const tzSelect = el('select');
+    tzSelect.appendChild(el('option', { value:'' }, '-- Select Time Zone --'));
+    tzList.forEach(tz=>{
+      const opt = el('option', { value: tz.title }, tz.title);
+      if((p.timeZone || '') === tz.title) opt.selected = true;
+      tzSelect.appendChild(opt);
+    });
+    tzSelect.addEventListener('change', ev=>{ p.timeZone = ev.target.value; });
+
+    app.appendChild(inputRow('Company Name *',      nameInput));
     app.appendChild(inputRow('Corporate Website *', webInput));
+    app.appendChild(inputRow('Time Zone *',         tzSelect));
     app.appendChild(el('div', { class:'small' }, 'Fields marked * are required.'));
 
     app.appendChild(btnRow(1,2,{
@@ -157,6 +181,7 @@ const pages = {
       onNext: async()=>{
         p.website = urlNormalize(p.website);
         if(!p.companyName || !p.website){ alert('Please provide Company Name and Corporate Website.'); return; }
+        if(!p.timeZone){ alert('Please select a Time Zone.'); return; }
         state.payload = state.payload || {}; state.payload.page1 = p; saveLocal();
         await savePage(state.draftId, 1, p);
         routeTo(2);
@@ -165,6 +190,7 @@ const pages = {
   },
 
   // 2) Sites
+  // CHANGED: Added Notes field to site entry form and display in table
   2: function sites(){
     const p = state.payload?.page2 || { sites: [] };
 
@@ -174,13 +200,13 @@ const pages = {
     );
 
     const table = el('table', { class:'table' });
-    const head  = el('tr', {}, el('th', {}, 'Site Name'), el('th', {}, 'URL'), el('th', {}, ''));
+    const head  = el('tr', {}, el('th', {}, 'Site Name'), el('th', {}, 'URL'), el('th', {}, 'Notes'), el('th', {}, ''));
     const tbody = el('tbody');
 
     function render(){
       tbody.innerHTML='';
       if(!Array.isArray(p.sites) || p.sites.length===0){
-        const tr = el('tr',{}, el('td',{colspan:'3',class:'small'}, 'Add sites using the form above.'));
+        const tr = el('tr',{}, el('td',{colspan:'4',class:'small'}, 'Add sites using the form above.'));
         tbody.appendChild(tr);
         return;
       }
@@ -188,18 +214,22 @@ const pages = {
         const tr = el('tr', {},
           el('td', {}, s.siteName || ''),
           el('td', {}, s.url || ''),
+          el('td', {}, s.notes || ''),
           el('td', {}, el('button', { class:'btn', onclick:()=>{ p.sites.splice(i,1); render(); } }, 'Remove'))
         );
         tbody.appendChild(tr);
       });
     }
 
-    const nameI = textField({ placeholder:'Site name (e.g. YourSite)' });
-    const urlI  = textField({ placeholder:'www.yoursite.com' });
+    const nameI  = textField({ placeholder:'Site name (e.g. YourSite)' });
+    const urlI   = textField({ placeholder:'www.yoursite.com' });
+    const notesI = textField({ placeholder:'Notes (optional)' }); // NEW
+
     const addBtn = el('button', { class:'btn', onclick:()=>{
       const u = urlNormalize(urlI.value);
       if(!nameI.value || !u){ alert('Provide site name and URL'); return; }
-      p.sites.push({ siteName:nameI.value, url:u }); nameI.value=''; urlI.value=''; render();
+      p.sites.push({ siteName:nameI.value, url:u, notes:notesI.value }); // NEW: notes added
+      nameI.value=''; urlI.value=''; notesI.value=''; render();
     } }, 'Add');
 
     table.appendChild(el('thead', {}, head));
@@ -207,8 +237,8 @@ const pages = {
 
     app.appendChild(header);
     app.appendChild(el('div', { class:'card' },
-      el('div', { class:'row' }, nameI, urlI, addBtn),
-      el('div',{style:'height:30px'}),  // spacing requested
+      el('div', { class:'row' }, nameI, urlI, notesI, addBtn), // NEW: notesI in row
+      el('div',{style:'height:30px'}),
       table
     ));
     render();
@@ -222,18 +252,20 @@ const pages = {
     }));
   },
 
-// 3) Contacts
+  // 3) Contacts
+  // CHANGED: Added IsAdOps checkbox
   3: function contacts(){
     const p = state.payload?.page3 || { contacts: [] };
 
     const table = el('table', { class:'table' });
     const thead = el('thead', {}, el('tr', {},
-      el('th', {style:'width:24%'}, 'Name'),
-      el('th', {style:'width:28%'}, 'Email'),
-      el('th', {style:'width:22%'}, 'Phone'),
-      el('th', {style:'width:10%'}, 'Primary'),
-      el('th', {style:'width:10%'}, 'Accounting'),
+      el('th', {style:'width:22%'}, 'Name'),
+      el('th', {style:'width:26%'}, 'Email'),
+      el('th', {style:'width:20%'}, 'Phone'),
+      el('th', {style:'width:8%'},  'Primary'),
+      el('th', {style:'width:8%'},  'Accounting'),
       el('th', {style:'width:6%'},  'Mobile'),
+      el('th', {style:'width:6%'},  'Ad Ops'),
       el('th', {}, '')
     ));
     const tbody = el('tbody');
@@ -241,7 +273,7 @@ const pages = {
     function render(){
       tbody.innerHTML='';
       if(!Array.isArray(p.contacts) || p.contacts.length===0){
-        const tr = el('tr',{}, el('td',{colspan:'7',class:'small'}, 'Add contacts using the form above.'));
+        const tr = el('tr',{}, el('td',{colspan:'8',class:'small'}, 'Add contacts using the form above.'));
         tbody.appendChild(tr);
         return;
       }
@@ -253,6 +285,7 @@ const pages = {
           el('td', {}, c.isPrimary?'Yes':''),
           el('td', {}, c.isAccounting?'Yes':''),
           el('td', {}, c.isMobile?'Mobile':''),
+          el('td', {}, c.isAdOps?'Yes':''),           // NEW: IsAdOps display
           el('td', {}, el('button',{class:'btn',onclick:()=>{p.contacts.splice(i,1);render();}},'Remove'))
         );
         tbody.appendChild(tr);
@@ -273,21 +306,26 @@ const pages = {
       }
     }catch{}
 
-    // MODIFICATION: Placeholder updated to indicate requirement
-    const ph = textField({ placeholder:'Phone (Required)' }); 
+    const ph = textField({ placeholder:'Phone (Required)' });
     ph.style.maxWidth='280px';
     const prim=el('input',{type:'checkbox'});
     const acct=el('input',{type:'checkbox'});
     const mob =el('input',{type:'checkbox'});
+    const adops=el('input',{type:'checkbox'});  // NEW: IsAdOps checkbox
 
     const add=el('button',{class:'btn',onclick:()=>{
-      // MODIFICATION: Added ph.value check to the validation
-      if(!f.value || !l.value || !e.value || !ph.value){ 
-        alert('Name, Email, and Phone are all required.'); 
-        return; 
+      if(!f.value || !l.value || !e.value || !ph.value){
+        alert('Name, Email, and Phone are all required.');
+        return;
       }
-      p.contacts.push({ firstName:f.value,lastName:l.value,email:e.value,phone:ph.value,isPrimary:prim.checked,isAccounting:acct.checked,isMobile:mob.checked });
-      f.value=l.value=e.value=ph.value=''; prim.checked=acct.checked=mob.checked=false; render();
+      p.contacts.push({
+        firstName:f.value, lastName:l.value, email:e.value, phone:ph.value,
+        isPrimary:prim.checked, isAccounting:acct.checked, isMobile:mob.checked,
+        isAdOps:adops.checked  // NEW
+      });
+      f.value=l.value=e.value=ph.value='';
+      prim.checked=acct.checked=mob.checked=adops.checked=false;
+      render();
     }},'Add');
 
     table.appendChild(thead);
@@ -300,7 +338,8 @@ const pages = {
       el('div',{class:'row kv',style:'margin-bottom:8px;'}, ph, el('label',{}, el('input',{type:'checkbox',onchange:ev=>{mob.checked=ev.target.checked;}}),' Is Mobile')),
       el('div',{class:'row',style:'margin-bottom:8px;'},
         el('label',{}, el('input',{type:'checkbox',onchange:ev=>{prim.checked=ev.target.checked;}}),' Is Primary Contact'),
-        el('label',{}, el('input',{type:'checkbox',onchange:ev=>{acct.checked=ev.target.checked;}}),' Is Accounting Contact')
+        el('label',{}, el('input',{type:'checkbox',onchange:ev=>{acct.checked=ev.target.checked;}}),' Is Accounting Contact'),
+        el('label',{}, el('input',{type:'checkbox',onchange:ev=>{adops.checked=ev.target.checked;}}),' Is Ad Ops Contact')  // NEW
       ),
       el('div',{class:'row',style:'margin-bottom:30px;'}, add),
       table
@@ -314,8 +353,8 @@ const pages = {
       }
     }));
   },
-  
-  // 4) Tax
+
+  // 4) Tax - UNCHANGED
   4: function tax(){
     const p = state.payload?.page4 || { taxDoc:null };
 
@@ -350,7 +389,7 @@ const pages = {
     }));
   },
 
-  // 5) Demographics + Check All
+  // 5) Demographics - UNCHANGED
   5: function demographics(){
     const p = state.payload?.page5 || { percentFemale:50, ageBracketIds:[], lifeStageIds:[], incomeBracketIds:[] };
 
@@ -410,7 +449,7 @@ const pages = {
     }));
   },
 
-  // 6) Interests + Check/Uncheck All
+  // 6) Interests - UNCHANGED
   6: function interests(){
     const p = state.payload?.page6 || { interestsAndIntentIds:[] };
 
@@ -443,47 +482,66 @@ const pages = {
     }));
   },
 
-  // 7) Capabilities – UPDATED to split Ad Types into CoReg and Display
+  // 7) Capabilities
+  // CHANGED: Split AdTypes into CoReg and Display, added Platform section
   7: function capabilities(){
-    const p = state.payload?.page7 || { coregAdTypeIds:[], displayAdTypeIds:[], pricingTypeIds:[], targetingIds:[], campaignFunctionalityIds:[], regionIds:[] };
+    const p = state.payload?.page7 || {
+      coregAdTypeIds:[], displayAdTypeIds:[],
+      pricingTypeIds:[], targetingIds:[],
+      campaignFunctionalityIds:[], regionIds:[],
+      platformValues:[]
+    };
 
-    const coregAdList    = sortByTitle(ref.coRegAdTypes||[]);
-    const displayAdList  = sortByTitle(ref.displayAdTypes||[]);
-    const pricingList= sortByTitle(ref.pricingTypes||[]);
-    const targList   = sortByTitle(ref.targeting||[]);
-    const campList   = sortByTitle(ref.campaignFunctionality||[]);
-    const regionList = sortByTitle(ref.regions||[]);
+    const coregList   = sortByTitle(ref.coRegAdTypes||[]);
+    const displayList = sortByTitle(ref.displayAdTypes||[]);
+    const pricingList = sortByTitle(ref.pricingTypes||[]);
+    const targList    = sortByTitle(ref.targeting||[]);
+    const campList    = sortByTitle(ref.campaignFunctionality||[]);
+    const regionList  = sortByTitle(ref.regions||[]);
+    const platformList= sortByTitle(ref.platforms||[]);
 
-    const sectCoRegAd=el('div'), sectDisplayAd=el('div'), sectPr=el('div'), sectTa=el('div'), sectCa=el('div'), sectRe=el('div');
+    const sectCoreg=el('div'), sectDisplay=el('div'), sectPr=el('div'),
+          sectTa=el('div'),    sectCa=el('div'),       sectRe=el('div'),
+          sectPlatform=el('div');
 
     function buildCaps(){
-      sectCoRegAd.innerHTML = sectDisplayAd.innerHTML = sectPr.innerHTML = sectTa.innerHTML = sectCa.innerHTML = sectRe.innerHTML = '';
-      const selCoRegAd = []; (p.coregAdTypeIds||[]).forEach(id=>{ const o=coregAdList.find(x=>x.id===id); if(o) selCoRegAd.push(o); });
-      const selDisplayAd = []; (p.displayAdTypeIds||[]).forEach(id=>{ const o=displayAdList.find(x=>x.id===id); if(o) selDisplayAd.push(o); });
-      const selPr = []; (p.pricingTypeIds||[]).forEach(id=>{ const o=pricingList.find(x=>x.id===id); if(o) selPr.push(o); });
-      const selTa = []; (p.targetingIds||[]).forEach(id=>{ const o=targList.find(x=>x.id===id); if(o) selTa.push(o); });
-      const selCa = []; (p.campaignFunctionalityIds||[]).forEach(id=>{ const o=campList.find(x=>x.id===id); if(o) selCa.push(o); });
-      const selRe = []; (p.regionIds||[]).forEach(id=>{ const o=regionList.find(x=>x.id===id); if(o) selRe.push(o); });
+      sectCoreg.innerHTML = sectDisplay.innerHTML = sectPr.innerHTML =
+      sectTa.innerHTML    = sectCa.innerHTML      = sectRe.innerHTML =
+      sectPlatform.innerHTML = '';
 
-      sectCoRegAd.appendChild(multiSelect(coregAdList,      selCoRegAd, sel=>{ p.coregAdTypeIds                 = sel.map(x=>x.id); }));
-      sectDisplayAd.appendChild(multiSelect(displayAdList,  selDisplayAd, sel=>{ p.displayAdTypeIds            = sel.map(x=>x.id); }));
-      sectPr.appendChild(multiSelect(pricingList, selPr, sel=>{ p.pricingTypeIds            = sel.map(x=>x.id); }));
-      sectTa.appendChild(multiSelect(targList,    selTa, sel=>{ p.targetingIds              = sel.map(x=>x.id); }));
-      sectCa.appendChild(multiSelect(campList,    selCa, sel=>{ p.campaignFunctionalityIds  = sel.map(x=>x.id); }));
-      sectRe.appendChild(multiSelect(regionList,  selRe, sel=>{ p.regionIds                 = sel.map(x=>x.id); }));
+      const selCoreg   = []; (p.coregAdTypeIds||[]).forEach(id=>{ const o=coregList.find(x=>x.id===id); if(o) selCoreg.push(o); });
+      const selDisplay = []; (p.displayAdTypeIds||[]).forEach(id=>{ const o=displayList.find(x=>x.id===id); if(o) selDisplay.push(o); });
+      const selPr      = []; (p.pricingTypeIds||[]).forEach(id=>{ const o=pricingList.find(x=>x.id===id); if(o) selPr.push(o); });
+      const selTa      = []; (p.targetingIds||[]).forEach(id=>{ const o=targList.find(x=>x.id===id); if(o) selTa.push(o); });
+      const selCa      = []; (p.campaignFunctionalityIds||[]).forEach(id=>{ const o=campList.find(x=>x.id===id); if(o) selCa.push(o); });
+      const selRe      = []; (p.regionIds||[]).forEach(id=>{ const o=regionList.find(x=>x.id===id); if(o) selRe.push(o); });
+
+      // Platform uses title-based matching (Choice field, not lookup)
+      const selPlatform = []; (p.platformValues||[]).forEach(val=>{
+        const o=platformList.find(x=>x.title===val); if(o) selPlatform.push(o);
+      });
+
+      sectCoreg.appendChild(multiSelect(coregList,    selCoreg,   sel=>{ p.coregAdTypeIds              = sel.map(x=>x.id); }));
+      sectDisplay.appendChild(multiSelect(displayList,selDisplay, sel=>{ p.displayAdTypeIds             = sel.map(x=>x.id); }));
+      sectPr.appendChild(multiSelect(pricingList,     selPr,      sel=>{ p.pricingTypeIds              = sel.map(x=>x.id); }));
+      sectTa.appendChild(multiSelect(targList,        selTa,      sel=>{ p.targetingIds                = sel.map(x=>x.id); }));
+      sectCa.appendChild(multiSelect(campList,        selCa,      sel=>{ p.campaignFunctionalityIds    = sel.map(x=>x.id); }));
+      sectRe.appendChild(multiSelect(regionList,      selRe,      sel=>{ p.regionIds                   = sel.map(x=>x.id); }));
+      // Platform saves titles (not IDs) since it's a Choice field
+      sectPlatform.appendChild(multiSelect(platformList, selPlatform, sel=>{ p.platformValues = sel.map(x=>x.title); }));
     }
 
     app.appendChild(el('div',{class:'card'}, el('h2',{},'Capabilities'), el('p',{class:'help'},'Please describe your advertising capabilities.')));
 
     app.appendChild(el('div',{class:'card'},
-      el('h3',{},'CoReg Ad Types (please select at least one from CoReg or Display)'),
-      sectCoRegAd,
-      el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.coregAdTypeIds = coregAdList.map(x=>x.id); buildCaps(); }}, 'Check All'))
+      el('h3',{},'CoReg Ad Types (please select at least one)'),
+      sectCoreg,
+      el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.coregAdTypeIds = coregList.map(x=>x.id); buildCaps(); }}, 'Check All'))
     ));
     app.appendChild(el('div',{class:'card'},
-      el('h3',{},'Display Ad Types (please select at least one from CoReg or Display)'),
-      sectDisplayAd,
-      el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.displayAdTypeIds = displayAdList.map(x=>x.id); buildCaps(); }}, 'Check All'))
+      el('h3',{},'Display Ad Types (please select at least one)'),
+      sectDisplay,
+      el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.displayAdTypeIds = displayList.map(x=>x.id); buildCaps(); }}, 'Check All'))
     ));
     app.appendChild(el('div',{class:'card'},
       el('h3',{},'Pricing Types (please select at least one)'),
@@ -505,6 +563,11 @@ const pages = {
       sectRe,
       el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.regionIds = regionList.map(x=>x.id); buildCaps(); }}, 'Check All'))
     ));
+    app.appendChild(el('div',{class:'card'},
+      el('h3',{},'Platform (please select at least one)'),
+      sectPlatform,
+      el('div',{class:'row'}, el('button',{class:'btn', onclick:()=>{ p.platformValues = platformList.map(x=>x.title); buildCaps(); }}, 'Check All'))
+    ));
 
     buildCaps();
 
@@ -512,14 +575,18 @@ const pages = {
       onPrev:()=>routeTo(6),
       nextText:'Save & Review',
       onNext: async()=>{
-        const ok = (p.coregAdTypeIds?.length || p.displayAdTypeIds?.length) && p.pricingTypeIds?.length && p.targetingIds?.length && p.campaignFunctionalityIds?.length && p.regionIds?.length;
-        if(!ok){ alert('Please select at least one in each section (CoReg or Display Ad Types required).'); return; }
+        const hasAdType = (p.coregAdTypeIds?.length || p.displayAdTypeIds?.length);
+        const ok = hasAdType && p.pricingTypeIds?.length && p.targetingIds?.length
+                   && p.campaignFunctionalityIds?.length && p.regionIds?.length
+                   && p.platformValues?.length;
+        if(!ok){ alert('Please select at least one in each section.'); return; }
         state.payload=state.payload||{}; state.payload.page7=p; saveLocal(); await savePage(state.draftId,7,p); routeTo(8);
       }
     }));
   },
 
-  // 8) Review – UPDATED to show both CoReg and Display Ad Types
+  // 8) Review
+  // CHANGED: Added TimeZone, Site Notes, IsAdOps, Platform, CoReg/Display AdTypes
   8: function review(){
     const tbl = el('table', { class:'table', style:'width:100%; background:transparent; border:0;' });
     const tbody = el('tbody');
@@ -535,21 +602,41 @@ const pages = {
     const box = el('div', { class:'card' });
     box.appendChild(el('h2', {}, 'Review'));
 
-    const p1=state.payload?.page1||{}; row('Company', p1.companyName||''); row('Website', p1.website||'');
-    const p2=state.payload?.page2||{sites:[]}; row('Sites', (p2.sites||[]).map(s=> `${s.siteName} (${s.url})`).join(', '));
-    const p3=state.payload?.page3||{contacts:[]}; row('Contacts', (p3.contacts||[]).map(c=>`${c.firstName||''} ${c.lastName||''} <${c.email||''}>${c.phone? ' ('+c.phone+')':''}${c.isPrimary?' [Primary]':''}${c.isAccounting?' [Accounting]':''}${c.isMobile?' [Mobile]':''}`).join('; '));
-    const p4=state.payload?.page4||{}; row('Tax Doc', p4.taxDoc? p4.taxDoc.fileName : 'None');
-    const p5=state.payload?.page5||{}; row('Percent Female', String(p5.percentFemale ?? 50)+'%');
+    const p1=state.payload?.page1||{};
+    row('Company', p1.companyName||'');
+    row('Website', p1.website||'');
+    row('Time Zone', p1.timeZone||'');  // NEW
+
+    const p2=state.payload?.page2||{sites:[]};
+    row('Sites', (p2.sites||[]).map(s=> `${s.siteName} (${s.url})${s.notes ? ' — ' + s.notes : ''}`).join(', ')); // NEW: notes in review
+
+    const p3=state.payload?.page3||{contacts:[]};
+    row('Contacts', (p3.contacts||[]).map(c=>
+      `${c.firstName||''} ${c.lastName||''} <${c.email||''}>${c.phone? ' ('+c.phone+')':''}` +
+      `${c.isPrimary?' [Primary]':''}${c.isAccounting?' [Accounting]':''}` +
+      `${c.isMobile?' [Mobile]':''}${c.isAdOps?' [Ad Ops]':''}`  // NEW: IsAdOps in review
+    ).join('; '));
+
+    const p4=state.payload?.page4||{};
+    row('Tax Doc', p4.taxDoc? p4.taxDoc.fileName : 'None');
+
+    const p5=state.payload?.page5||{};
+    row('Percent Female', String(p5.percentFemale ?? 50)+'%');
     row('Age Brackets', titlesFrom(ref.ageBrackets, p5.ageBracketIds).join(', ') || 'None');
     row('Life Stages', titlesFrom(ref.lifeStages, p5.lifeStageIds).join(', ') || 'None');
     row('Household Income', titlesFrom(ref.householdIncomeBrackets, p5.incomeBracketIds).join(', ') || 'None');
-    const p6=state.payload?.page6||{}; row('Interests', titlesFrom(ref.interestsAndIntent, p6.interestsAndIntentIds).join(', ') || 'None');
-    const p7=state.payload?.page7||{}; row('CoReg Ad Types', titlesFrom(ref.coRegAdTypes, p7.coregAdTypeIds).join(', ') || 'None');
-    row('Display Ad Types', titlesFrom(ref.displayAdTypes, p7.displayAdTypeIds).join(', ') || 'None');
-    row('Pricing Types', titlesFrom(ref.pricingTypes, p7.pricingTypeIds).join(', ') || 'None');
-    row('Targeting', titlesFrom(ref.targeting, p7.targetingIds).join(', ') || 'None');
-    row('Campaign Func', titlesFrom(ref.campaignFunctionality, p7.campaignFunctionalityIds).join(', ') || 'None');
-    row('Regions', titlesFrom(ref.regions, p7.regionIds).join(', ') || 'None');
+
+    const p6=state.payload?.page6||{};
+    row('Interests', titlesFrom(ref.interestsAndIntent, p6.interestsAndIntentIds).join(', ') || 'None');
+
+    const p7=state.payload?.page7||{};
+    row('CoReg Ad Types',   titlesFrom(ref.coRegAdTypes||[], p7.coregAdTypeIds).join(', ')  || 'None');   // NEW
+    row('Display Ad Types', titlesFrom(ref.displayAdTypes||[], p7.displayAdTypeIds).join(', ') || 'None'); // NEW
+    row('Pricing Types',    titlesFrom(ref.pricingTypes, p7.pricingTypeIds).join(', ')      || 'None');
+    row('Targeting',        titlesFrom(ref.targeting, p7.targetingIds).join(', ')            || 'None');
+    row('Campaign Func',    titlesFrom(ref.campaignFunctionality, p7.campaignFunctionalityIds).join(', ') || 'None');
+    row('Regions',          titlesFrom(ref.regions, p7.regionIds).join(', ')                 || 'None');
+    row('Platform',         (p7.platformValues||[]).join(', ')                               || 'None');   // NEW
 
     tbl.appendChild(tbody); box.appendChild(tbl);
     app.appendChild(box);
