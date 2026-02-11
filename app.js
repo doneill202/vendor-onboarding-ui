@@ -498,7 +498,7 @@ const pages = {
     const targList    = sortByTitle(ref.targeting||[]);
     const campList    = sortByTitle(ref.campaignFunctionality||[]);
     const regionList  = sortByTitle(ref.regions||[]);
-    const platformList= sortByTitle(ref.platforms||[]);
+    const platformList= ref.platforms||[];
 
     const sectCoreg=el('div'), sectDisplay=el('div'), sectPr=el('div'),
           sectTa=el('div'),    sectCa=el('div'),       sectRe=el('div'),
