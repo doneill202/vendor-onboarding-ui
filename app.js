@@ -29,7 +29,7 @@ const steps = [
 
 // App state
 let ref = null; // reference data (lists)
-let state = { draftId:null, step:1, vendorToken:null, inviterEmail:'', payload:{}, invite:null };
+let state = { draftId:null, step:1, vendorToken:null, inviterEmail:'', payload:{}, invite:null, submitted:false };
 
 // Utils
 function qs(name){ return new URL(window.location).searchParams.get(name); }
@@ -592,8 +592,10 @@ const pages = {
   },
 
   // 8) Review
-  // CHANGED: Added TimeZone, Site Notes, IsAdOps, Platform, CoReg/Display AdTypes
   8: function review(){
+    // If already submitted (e.g. user hit Back after submitting), show thank-you instead
+    if(state.submitted){ showThanks(); return; }
+
     const tbl = el('table', { class:'table', style:'width:100%; background:transparent; border:0;' });
     const tbody = el('tbody');
     function row(label, valueEl){
@@ -647,7 +649,7 @@ const pages = {
     tbl.appendChild(tbody); box.appendChild(tbl);
     app.appendChild(box);
 
-    const submit = el('button', { class:'btn primary', onclick: async()=>{ try{ const res = await submitDraft(state.draftId); const data = res?.data || res; if(data?.alreadySubmitted){ showThanks(); return; } showThanks(); }catch(e){ alert('Submit failed: '+e.message); } } }, 'Submit');
+    const submit = el('button', { class:'btn primary', onclick: async()=>{ try{ const res = await submitDraft(state.draftId); const data = res?.data || res; state.submitted = true; saveLocal(); if(data?.alreadySubmitted){ showThanks(); return; } showThanks(); }catch(e){ alert('Submit failed: '+e.message); } } }, 'Submit');
     app.appendChild(el('div', { class:'row' }, el('button', { class:'btn', onclick:()=> routeTo(7) }, 'Back'), submit));
   }
 };
