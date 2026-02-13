@@ -97,6 +97,12 @@ async function bootstrap(){
       }
     }
 
+// If the draft was already submitted, go straight to the thank-you screen
+    if (init.vendorId) {
+      showThanks();
+      return;
+    }
+
     renderNav();
     routeTo(state.step);
   }catch(e){
@@ -641,7 +647,7 @@ const pages = {
     tbl.appendChild(tbody); box.appendChild(tbl);
     app.appendChild(box);
 
-    const submit = el('button', { class:'btn primary', onclick: async()=>{ try{ await submitDraft(state.draftId); showThanks(); }catch(e){ alert('Submit failed: '+e.message); } } }, 'Submit');
+    const submit = el('button', { class:'btn primary', onclick: async()=>{ try{ const res = await submitDraft(state.draftId); const data = res?.data || res; if(data?.alreadySubmitted){ showThanks(); return; } showThanks(); }catch(e){ alert('Submit failed: '+e.message); } } }, 'Submit');
     app.appendChild(el('div', { class:'row' }, el('button', { class:'btn', onclick:()=> routeTo(7) }, 'Back'), submit));
   }
 };
