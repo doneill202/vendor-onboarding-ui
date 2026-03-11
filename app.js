@@ -649,7 +649,23 @@ const pages = {
     tbl.appendChild(tbody); box.appendChild(tbl);
     app.appendChild(box);
 
-    const submit = el('button', { class:'btn primary', onclick: async()=>{ try{ const res = await submitDraft(state.draftId); const data = res?.data || res; state.submitted = true; saveLocal(); if(data?.alreadySubmitted){ showThanks(); return; } showThanks(); }catch(e){ alert('Submit failed: '+e.message); } } }, 'Submit');
+    const submit = el('button', { class:'btn primary', onclick: async(e)=>{
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      btn.textContent = 'Submitting...';
+      try{
+        const res = await submitDraft(state.draftId);
+        const data = res?.data || res;
+        state.submitted = true;
+        saveLocal();
+        if(data?.alreadySubmitted){ showThanks(); return; }
+        showThanks();
+      }catch(err){
+        btn.disabled = false;
+        btn.textContent = 'Submit';
+        alert('Submit failed: '+err.message);
+      }
+    }}, 'Submit');    
     app.appendChild(el('div', { class:'row' }, el('button', { class:'btn', onclick:()=> routeTo(7) }, 'Back'), submit));
   }
 };
