@@ -147,8 +147,20 @@ const pages = {
     const nameInput = textField({ value: p.companyName || '', oninput:v=> p.companyName = v });
     const webInput  = textField({ type:'url', value: p.website || '', oninput:v=> p.website = v, placeholder:'www.corporate.com' });
 
+    const timeZones = ['Eastern','Central','Mountain','Pacific','Other - Europe','Other - Asia'];
+    const tzSelect = el('select', { class:'input' });
+    const tzDefault = el('option', { value:'' }, '-- Select your time zone --');
+    tzSelect.appendChild(tzDefault);
+    timeZones.forEach(tz => {
+      const opt = el('option', { value: tz }, tz);
+      if(p.timeZone === tz) opt.selected = true;
+      tzSelect.appendChild(opt);
+    });
+    tzSelect.addEventListener('change', ev => { p.timeZone = ev.target.value; });
+
     app.appendChild(inputRow('Company Name *',     nameInput));
     app.appendChild(inputRow('Corporate Website *', webInput));
+    app.appendChild(inputRow('Time Zone *',        tzSelect));
     app.appendChild(el('div', { class:'small' }, 'Fields marked * are required.'));
 
     app.appendChild(btnRow(1,2,{
@@ -156,7 +168,7 @@ const pages = {
       nextText:'Save & Continue',
       onNext: async()=>{
         p.website = urlNormalize(p.website);
-        if(!p.companyName || !p.website){ alert('Please provide Company Name and Corporate Website.'); return; }
+        if(!p.companyName || !p.website || !p.timeZone){ alert('Please provide Company Name, Corporate Website, and Time Zone.'); return; }
         state.payload = state.payload || {}; state.payload.page1 = p; saveLocal();
         await savePage(state.draftId, 1, p);
         routeTo(2);
@@ -443,7 +455,7 @@ const pages = {
 
   // 7) Capabilities — CoReg and Display ad types split
   7: function capabilities(){
-    const p = state.payload?.page7 || { coregAdTypeIds:[], displayAdTypeIds:[], pricingTypeIds:[], targetingIds:[], campaignFunctionalityIds:[], regionIds:[] };
+    const p = state.payload?.page7 || { coregAdTypeIds:[], displayAdTypeIds:[], pricingTypeIds:[], targetingIds:[], campaignFunctionalityIds:[], regionIds:[], platformValues:[] };
 
     const coregList  = sortByTitle(ref.coRegAdTypes||[]);
     const displayList= sortByTitle(ref.displayAdTypes||[]);
@@ -451,6 +463,7 @@ const pages = {
     const targList   = sortByTitle(ref.targeting||[]);
     const campList   = sortByTitle(ref.campaignFunctionality||[]);
     const regionList = sortByTitle(ref.regions||[]);
+    const platformOptions = ['Active Prospect','Lead Prosper','Twyne','AdSmith','LeadsPedia','HasOffers','Everflow','SalesForce','Boardwalk Marketing','Proprietary','Other'];
 
     const sectCo=el('div'), sectDi=el('div'), sectPr=el('div'), sectTa=el('div'), sectCa=el('div'), sectRe=el('div');
 
@@ -471,8 +484,32 @@ const pages = {
       sectRe.appendChild(multiSelect(regionList,  selRe, sel=>{ p.regionIds               = sel.map(x=>x.id); }));
     }
 
+    // Platform — checkbox list (multi-select, string values not IDs)
+    function buildPlatform(){
+      sectPl.innerHTML = '';
+      platformOptions.forEach(name => {
+        const checked = (p.platformValues||[]).includes(name);
+        const cb = el('input', { type:'checkbox', ...(checked ? {checked:true} : {}) });
+        cb.addEventListener('change', ()=>{
+          if(cb.checked){
+            if(!(p.platformValues||[]).includes(name)) p.platformValues = [...(p.platformValues||[]), name];
+          } else {
+            p.platformValues = (p.platformValues||[]).filter(v => v !== name);
+          }
+        });
+        const lbl = el('label', { style:'display:flex;align-items:center;gap:8px;margin:4px 0;cursor:pointer;' }, cb, name);
+        sectPl.appendChild(lbl);
+      });
+    }
+
+    const sectPl = el('div', { style:'columns:2;' });
+
     app.appendChild(el('div',{class:'card'}, el('h2',{},'Capabilities'), el('p',{class:'help'},'Please describe your advertising capabilities.')));
 
+    app.appendChild(el('div',{class:'card'},
+      el('h3',{},'Platform (please select at least one)'),
+      sectPl
+    ));
     app.appendChild(el('div',{class:'card'},
       el('h3',{},'CoReg Ad Types (please select at least one from CoReg or Display)'),
       sectCo,
@@ -505,14 +542,15 @@ const pages = {
     ));
 
     buildCaps();
+    buildPlatform();
 
     app.appendChild(btnRow(6,8,{
       onPrev:()=>routeTo(6),
       nextText:'Save & Review',
       onNext: async()=>{
         const adsOk = p.coregAdTypeIds?.length || p.displayAdTypeIds?.length;
-        const ok = adsOk && p.pricingTypeIds?.length && p.targetingIds?.length && p.campaignFunctionalityIds?.length && p.regionIds?.length;
-        if(!ok){ alert('Please select at least one Ad Type (CoReg or Display) and at least one in each other section.'); return; }
+        const ok = adsOk && p.pricingTypeIds?.length && p.targetingIds?.length && p.campaignFunctionalityIds?.length && p.regionIds?.length && p.platformValues?.length;
+        if(!ok){ alert('Please select at least one Platform, one Ad Type (CoReg or Display), and at least one in each other section.'); return; }
         state.payload=state.payload||{}; state.payload.page7=p; saveLocal(); await savePage(state.draftId,7,p); routeTo(8);
       }
     }));
@@ -534,7 +572,7 @@ const pages = {
     const box = el('div', { class:'card' });
     box.appendChild(el('h2', {}, 'Review'));
 
-    const p1=state.payload?.page1||{}; row('Company', p1.companyName||''); row('Website', p1.website||'');
+    const p1=state.payload?.page1||{}; row('Company', p1.companyName||''); row('Website', p1.website||''); row('Time Zone', p1.timeZone||'None');
     const p2=state.payload?.page2||{sites:[]}; row('Sites', (p2.sites||[]).map(s=> `${s.siteName} (${s.url})`).join(', '));
     const p3=state.payload?.page3||{contacts:[]}; row('Contacts', (p3.contacts||[]).map(c=>`${c.firstName||''} ${c.lastName||''} <${c.email||''}>${c.phone? ' ('+c.phone+')':''}${c.isPrimary?' [Primary]':''}${c.isAccounting?' [Accounting]':''}${c.isMobile?' [Mobile]':''}`).join('; '));
     const p4=state.payload?.page4||{}; row('Tax Doc', p4.taxDoc? p4.taxDoc.fileName : 'None');
@@ -549,6 +587,7 @@ const pages = {
     row('Pricing Types', titlesFrom(ref.pricingTypes, p7.pricingTypeIds).join(', ') || 'None');
     row('Targeting', titlesFrom(ref.targeting, p7.targetingIds).join(', ') || 'None');
     row('Campaign Func', titlesFrom(ref.campaignFunctionality, p7.campaignFunctionalityIds).join(', ') || 'None');
+    row('Platform', (p7.platformValues||[]).join(', ') || 'None');
     row('Regions', titlesFrom(ref.regions, p7.regionIds).join(', ') || 'None');
 
     tbl.appendChild(tbody); box.appendChild(tbl);
